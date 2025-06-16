@@ -1,6 +1,6 @@
 # FbsDumper
 A tool to recover flatbuffers definitions from game assemblies.
-It's exactly the same as [https://github.com/Hiro420/FbsDumper](my old FBS dumper), except it relies on asm instructions parsing.
+It's exactly the same as [my old FBS dumper](https://github.com/Hiro420/FbsDumper), except it relies on asm instructions parsing.
 
 - TODO: default values
 
