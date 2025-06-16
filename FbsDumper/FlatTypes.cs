@@ -14,6 +14,7 @@ public class FlatSchema
 
 public class FlatTable
 {
+    public bool noCreate = false;
     public string tableName;
     public List<FlatField> fields = new List<FlatField>();
 
@@ -31,8 +32,9 @@ public class FlatField
 
     public bool isArray;
     public string name;
+	public int offset;
 
-    public FlatField(TypeDefinition type, string name, bool isArray = false)
+	public FlatField(TypeDefinition type, string name, bool isArray = false)
     {
         this.type = type;
         this.name = name;
