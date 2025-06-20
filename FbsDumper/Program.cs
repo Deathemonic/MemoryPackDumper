@@ -8,35 +8,65 @@ namespace FbsDumper;
 
 public class MainApp
 {
-    public static readonly bool ForceSnakeCase = false;
-    private static readonly string? CustomNameSpace = "FlatData"; // can also be String.Empty, "", or null to not specify namespace
-	public static readonly string? NameSpace2LookFor = null; // can also be MX.Data.Excel or FlatData to specify different namespaces
+    private static string DummyAssemblyDir = "DummyDll";
+	public static string LibIl2CppPath = "libil2cpp.so"; // change it to the actual path
+	private static string OutputFileName = "BlueArchive.fbs";
+    private static string? CustomNameSpace = "FlatData"; // can also be String.Empty, "", or null to not specify namespace
+    public static bool ForceSnakeCase = false;
+	public static string? NameSpace2LookFor = null; // can also be MX.Data.Excel or FlatData to specify different namespaces
 	private static readonly string FlatBaseType = "FlatBuffers.IFlatbufferObject";
-    private static readonly string DummyAssemblyDir = "DummyDll";
-	public static readonly string LibIl2CppPath = "libil2cpp.so"; // change it to the actual path
-	private static readonly string OutputFileName = "BlueArchive.fbs";
     public static FlatBufferBuilder flatBufferBuilder;
     public static List<TypeDefinition> flatEnumsToAdd = new List<TypeDefinition>(); // for GetAllFlatBufferTypes -> getting enums part
 
     public static void Main(string[] args)
     {
+        ParseArguments(args);
+
+        if (!Directory.Exists(DummyAssemblyDir))
+        {
+            Console.WriteLine($"[ERR] Dummy assembly directory '{DummyAssemblyDir}' not found.");
+            Console.WriteLine("Please provide a valid path using --dummy-dir or -d.");
+            Environment.Exit(1);
+        }
+        if (!File.Exists(LibIl2CppPath))
+        {
+            Console.WriteLine($"[ERR] libil2cpp.so path '{LibIl2CppPath}' not found.");
+            Console.WriteLine("Please provide a valid path using --libil2cpp-path or -l.");
+            Environment.Exit(1);
+        }
+
         DefaultAssemblyResolver resolver = new DefaultAssemblyResolver();
         resolver.AddSearchDirectory(DummyAssemblyDir);
         ReaderParameters readerParameters = new ReaderParameters();
         readerParameters.AssemblyResolver = resolver;
         Console.WriteLine("Reading game assemblies...");
-        AssemblyDefinition asm = AssemblyDefinition.ReadAssembly(Path.Combine(DummyAssemblyDir, "BlueArchive.dll"), readerParameters);
-		AssemblyDefinition asmFBS = AssemblyDefinition.ReadAssembly(Path.Combine(DummyAssemblyDir, "FlatBuffers.dll"), readerParameters);
+        
+        string blueArchiveDllPath = Path.Combine(DummyAssemblyDir, "BlueArchive.dll");
+        if (!File.Exists(blueArchiveDllPath))
+        {
+            Console.WriteLine($"[ERR] BlueArchive.dll not found in '{DummyAssemblyDir}'.");
+            Environment.Exit(1);
+        }
+        AssemblyDefinition asm = AssemblyDefinition.ReadAssembly(blueArchiveDllPath, readerParameters);
+
+        string flatBuffersDllPath = Path.Combine(DummyAssemblyDir, "FlatBuffers.dll");
+        if (!File.Exists(flatBuffersDllPath))
+        {
+            Console.WriteLine($"[ERR] FlatBuffers.dll not found in '{DummyAssemblyDir}'.");
+            Environment.Exit(1);
+        }
+        AssemblyDefinition asmFBS = AssemblyDefinition.ReadAssembly(flatBuffersDllPath, readerParameters);
+        
         flatBufferBuilder = new FlatBufferBuilder(asmFBS.MainModule);
         TypeHelper typeHelper = new TypeHelper();
-		Console.WriteLine("Getting a list of types...");
-		List<TypeDefinition> typeDefs = typeHelper.GetAllFlatBufferTypes(asm.MainModule, FlatBaseType);
+        Console.WriteLine("Getting a list of types...");
+        List<TypeDefinition> typeDefs = typeHelper.GetAllFlatBufferTypes(asm.MainModule, FlatBaseType);
         FlatSchema schema = new FlatSchema();
         int done = 0;
-		foreach (TypeDefinition typeDef in typeDefs)
-		{
-			Console.Write($"Disassembling types ({done+1}/{typeDefs.Count})...      \r");
-			FlatTable? table = typeHelper.Type2Table(typeDef);
+        foreach (TypeDefinition typeDef in typeDefs)
+        {
+            Console.Write($"Disassembling types ({done + 1}/{typeDefs.Count})... \r");
+            FlatTable? table = typeHelper.Type2Table(typeDef);
             if (table == null)
             {
                 Console.WriteLine($"[ERR] Error dumping table for {typeDef.FullName}");
@@ -45,8 +75,8 @@ public class MainApp
             schema.flatTables.Add(table);
             done += 1;
         }
-		Console.WriteLine($"Adding enums...");
-		foreach (TypeDefinition typeDef in flatEnumsToAdd)
+        Console.WriteLine($"Adding enums...");
+        foreach (TypeDefinition typeDef in flatEnumsToAdd)
         {
             FlatEnum? fEnum = TypeHelper.Type2Enum(typeDef);
             if (fEnum == null)
@@ -56,10 +86,106 @@ public class MainApp
             }
             schema.flatEnums.Add(fEnum);
         }
-		Console.WriteLine($"Writing schema...");
-		File.WriteAllText(OutputFileName, SchemaToString(schema));
-		Console.WriteLine($"Done.");
-	}
+        Console.WriteLine($"Writing schema to {OutputFileName}...");
+        File.WriteAllText(OutputFileName, SchemaToString(schema));
+        Console.WriteLine($"Done.");
+    }
+
+    private static void ParseArguments(string[] args)
+    {
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i].ToLower())
+            {
+                case "--dummy-dir":
+                case "-d":
+                    if (i + 1 < args.Length)
+                    {
+                        DummyAssemblyDir = args[++i];
+                    }
+                    else
+                    {
+                        Console.WriteLine("[ERR] --dummy-dir requires a path.");
+                        Environment.Exit(1);
+                    }
+                    break;
+                case "--libil2cpp-path":
+                case "-l":
+                    if (i + 1 < args.Length)
+                    {
+                        LibIl2CppPath = args[++i];
+                    }
+                    else
+                    {
+                        Console.WriteLine("[ERR] --libil2cpp-path requires a path.");
+                        Environment.Exit(1);
+                    }
+                    break;
+                case "--output-file":
+                case "-o":
+                    if (i + 1 < args.Length)
+                    {
+                        OutputFileName = args[++i];
+                    }
+                    else
+                    {
+                        Console.WriteLine("[ERR] --output-file requires a file name.");
+                        Environment.Exit(1);
+                    }
+                    break;
+                case "--namespace":
+                case "-n":
+                    if (i + 1 < args.Length)
+                    {
+                        CustomNameSpace = args[++i];
+                    }
+                    else
+                    {
+                        Console.WriteLine("[ERR] --namespace requires a namespace string.");
+                        Environment.Exit(1);
+                    }
+                    break;
+                case "--force-snake-case":
+                case "-s":
+                    ForceSnakeCase = true;
+                    break;
+                case "--namespace-to-look-for":
+                case "-nl":
+                    if (i + 1 < args.Length)
+                    {
+                        NameSpace2LookFor = args[++i];
+                    }
+                    else
+                    {
+                        Console.WriteLine("[ERR] --namespace-to-look-for requires a namespace string.");
+                        Environment.Exit(1);
+                    }
+                    break;
+                case "--help":
+                case "-h":
+                    PrintHelp();
+                    Environment.Exit(0);
+                    break;
+                default:
+                    Console.WriteLine($"[WARN] Unknown argument: {args[i]}. Use --help for usage information.");
+                    break;
+            }
+        }
+    }
+
+
+    private static void PrintHelp()
+    {
+        Console.WriteLine("Usage: FbsDumper [options]");
+        Console.WriteLine("\nOptions:");
+        Console.WriteLine("  -d, --dummy-dir <PATH>          (Mandatory) Path to the directory containing dummy assemblies (e.g., DummyDll).");
+        Console.WriteLine("  -l, --libil2cpp-path <PATH>     (Mandatory) Path to the libil2cpp.so file.");
+        Console.WriteLine("  -o, --output-file <NAME>        (Optional) Name of the output FlatBuffer schema file (default: BlueArchive.fbs).");
+        Console.WriteLine("  -n, --namespace <NAMESPACE>     (Optional) Custom namespace for the FlatBuffer schema (default: FlatData).");
+        Console.WriteLine("  -s, --force-snake-case          (Optional) Convert field names to snake_case (default: false).");
+        Console.WriteLine("  -nl, --namespace-to-look-for <NAMESPACE> (Optional) Specify a namespace to filter types (e.g., MX.Data.Excel or FlatData).");
+        Console.WriteLine("  -h, --help                      Show this help message and exit.");
+    }
 
     private static string SchemaToString(FlatSchema schema)
     {
