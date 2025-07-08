@@ -396,3 +396,8 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Dump files
+DummyDll
+libil2cpp.so
+*.fbs
