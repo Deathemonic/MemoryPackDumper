@@ -1,15 +1,14 @@
 ﻿using Mono.Cecil;
 using System.Text;
 using System.Text.RegularExpressions;
-using Newtonsoft.Json;
-using System;
+using PowerArgs;
 
 namespace FbsDumper;
 
 public class MainApp
 {
     private static string DummyAssemblyDir = "DummyDll";
-	public static string LibIl2CppPath = "libil2cpp.so"; // change it to the actual path
+	public static string GameAssemblyPath = "libil2cpp.so"; // change it to the actual path
 	private static string OutputFileName = "BlueArchive.fbs";
     private static string? CustomNameSpace = "FlatData"; // can also be String.Empty, "", or null to not specify namespace
     public static bool ForceSnakeCase = false;
@@ -20,7 +19,15 @@ public class MainApp
 
     public static void Main(string[] args)
     {
-        ParseArguments(args);
+        var parsedArgs = Args.Parse<FbsDumperArgs>(args);
+
+        DummyAssemblyDir = parsedArgs.DummyDll ?? "DummyDll";
+        GameAssemblyPath = parsedArgs.GameAssembly ?? "GameAssembly.dll";
+        OutputFileName = parsedArgs.OutputFile ?? "BlueArchive.fbs";
+        CustomNameSpace = parsedArgs.Namespace ?? "FlatData";
+        NameSpace2LookFor = parsedArgs.NamespaceToLookFor ?? null;
+        ForceSnakeCase = parsedArgs.ForceSnakeCase;
+
 
         if (!Directory.Exists(DummyAssemblyDir))
         {
@@ -28,9 +35,9 @@ public class MainApp
             Console.WriteLine("Please provide a valid path using --dummy-dir or -d.");
             Environment.Exit(1);
         }
-        if (!File.Exists(LibIl2CppPath))
+        if (!File.Exists(GameAssemblyPath))
         {
-            Console.WriteLine($"[ERR] libil2cpp.so path '{LibIl2CppPath}' not found.");
+            Console.WriteLine($"[ERR] libil2cpp.so path '{GameAssemblyPath}' not found.");
             Console.WriteLine("Please provide a valid path using --libil2cpp-path or -l.");
             Environment.Exit(1);
         }
@@ -89,102 +96,6 @@ public class MainApp
         Console.WriteLine($"Writing schema to {OutputFileName}...");
         File.WriteAllText(OutputFileName, SchemaToString(schema));
         Console.WriteLine($"Done.");
-    }
-
-    private static void ParseArguments(string[] args)
-    {
-        for (int i = 0; i < args.Length; i++)
-        {
-            switch (args[i].ToLower())
-            {
-                case "--dummy-dir":
-                case "-d":
-                    if (i + 1 < args.Length)
-                    {
-                        DummyAssemblyDir = args[++i];
-                    }
-                    else
-                    {
-                        Console.WriteLine("[ERR] --dummy-dir requires a path.");
-                        Environment.Exit(1);
-                    }
-                    break;
-                case "--libil2cpp-path":
-                case "-l":
-                    if (i + 1 < args.Length)
-                    {
-                        LibIl2CppPath = args[++i];
-                    }
-                    else
-                    {
-                        Console.WriteLine("[ERR] --libil2cpp-path requires a path.");
-                        Environment.Exit(1);
-                    }
-                    break;
-                case "--output-file":
-                case "-o":
-                    if (i + 1 < args.Length)
-                    {
-                        OutputFileName = args[++i];
-                    }
-                    else
-                    {
-                        Console.WriteLine("[ERR] --output-file requires a file name.");
-                        Environment.Exit(1);
-                    }
-                    break;
-                case "--namespace":
-                case "-n":
-                    if (i + 1 < args.Length)
-                    {
-                        CustomNameSpace = args[++i];
-                    }
-                    else
-                    {
-                        Console.WriteLine("[ERR] --namespace requires a namespace string.");
-                        Environment.Exit(1);
-                    }
-                    break;
-                case "--force-snake-case":
-                case "-s":
-                    ForceSnakeCase = true;
-                    break;
-                case "--namespace-to-look-for":
-                case "-nl":
-                    if (i + 1 < args.Length)
-                    {
-                        NameSpace2LookFor = args[++i];
-                    }
-                    else
-                    {
-                        Console.WriteLine("[ERR] --namespace-to-look-for requires a namespace string.");
-                        Environment.Exit(1);
-                    }
-                    break;
-                case "--help":
-                case "-h":
-                    PrintHelp();
-                    Environment.Exit(0);
-                    break;
-                default:
-                    Console.WriteLine($"[WARN] Unknown argument: {args[i]}. Use --help for usage information.");
-                    break;
-            }
-        }
-    }
-
-
-    private static void PrintHelp()
-    {
-        Console.WriteLine("Usage: FbsDumper [options]");
-        Console.WriteLine("\nOptions:");
-        Console.WriteLine("  -d, --dummy-dir <PATH>          (Mandatory) Path to the directory containing dummy assemblies (e.g., DummyDll).");
-        Console.WriteLine("  -l, --libil2cpp-path <PATH>     (Mandatory) Path to the libil2cpp.so file.");
-        Console.WriteLine("  -o, --output-file <NAME>        (Optional) Name of the output FlatBuffer schema file (default: BlueArchive.fbs).");
-        Console.WriteLine("  -n, --namespace <NAMESPACE>     (Optional) Custom namespace for the FlatBuffer schema (default: FlatData).");
-        Console.WriteLine("  -s, --force-snake-case          (Optional) Convert field names to snake_case (default: false).");
-        Console.WriteLine("  -nl, --namespace-to-look-for <NAMESPACE> (Optional) Specify a namespace to filter types (e.g., MX.Data.Excel or FlatData).");
-        Console.WriteLine("  -h, --help                      Show this help message and exit.");
     }
 
     private static string SchemaToString(FlatSchema schema)

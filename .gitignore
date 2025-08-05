@@ -398,6 +398,7 @@ FodyWeavers.xsd
 *.sln.iml
 
 # Dump files
-DummyDll
+DummyDll*
+GameAssembly.dll
 libil2cpp.so
 *.fbs
