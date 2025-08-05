@@ -1,4 +1,4 @@
-﻿using Mono.Cecil;
+using Mono.Cecil;
 using System.Text;
 using System.Text.RegularExpressions;
 using PowerArgs;
@@ -32,13 +32,13 @@ public class MainApp
         if (!Directory.Exists(DummyAssemblyDir))
         {
             Console.WriteLine($"[ERR] Dummy assembly directory '{DummyAssemblyDir}' not found.");
-            Console.WriteLine("Please provide a valid path using --dummy-dir or -d.");
+            Console.WriteLine("Please provide a valid path using -dummydll or -d.");
             Environment.Exit(1);
         }
         if (!File.Exists(GameAssemblyPath))
         {
             Console.WriteLine($"[ERR] libil2cpp.so path '{GameAssemblyPath}' not found.");
-            Console.WriteLine("Please provide a valid path using --libil2cpp-path or -l.");
+            Console.WriteLine("Please provide a valid path using -gameassembly or -a.");
             Environment.Exit(1);
         }
 

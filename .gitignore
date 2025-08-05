@@ -402,3 +402,5 @@ DummyDll*
 GameAssembly.dll
 libil2cpp.so
 *.fbs
+
+.idea
