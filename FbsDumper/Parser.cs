@@ -1,36 +1,38 @@
-using Mono.Cecil;
 using System.Text;
 using System.Text.RegularExpressions;
+using Mono.Cecil;
 
 namespace FbsDumper;
 
-public static class Parser
+public static partial class Parser
 {
-    private static string DummyAssemblyDir = "DummyDll";
+    private static string _dummyAssemblyDir = "DummyDll";
     public static string GameAssemblyPath = "libil2cpp.so";
-    private static string OutputFileName = "BlueArchive.fbs";
-    private static string? CustomNameSpace = "FlatData";
-    public static bool ForceSnakeCase = false;
-    public static string? NameSpace2LookFor = null;
+    private static string _outputFileName = "BlueArchive.fbs";
+    private static string? _customNameSpace = "FlatData";
+    private static bool _forceSnakeCase;
+    public static string? NameSpace2LookFor;
     private static readonly string FlatBaseType = "FlatBuffers.IFlatbufferObject";
-    public static FlatBufferBuilder flatBufferBuilder = null!;
-    public static List<TypeDefinition> flatEnumsToAdd = new List<TypeDefinition>();
+    public static FlatBufferBuilder FlatBufferBuilder = null!;
+    public static readonly List<TypeDefinition> FlatEnumsToAdd = [];
 
-    public static void Execute(string dummyDll, string gameAssembly, string outputFile, string nameSpace, bool forceSnakeCase, string? namespaceToLookFor)
+    public static void Execute(string dummyDll, string gameAssembly, string outputFile, string nameSpace,
+        bool forceSnakeCase, string? namespaceToLookFor)
     {
-        DummyAssemblyDir = dummyDll;
+        _dummyAssemblyDir = dummyDll;
         GameAssemblyPath = gameAssembly;
-        OutputFileName = outputFile;
-        CustomNameSpace = nameSpace;
+        _outputFileName = outputFile;
+        _customNameSpace = nameSpace;
         NameSpace2LookFor = namespaceToLookFor;
-        ForceSnakeCase = forceSnakeCase;
+        _forceSnakeCase = forceSnakeCase;
 
-        if (!Directory.Exists(DummyAssemblyDir))
+        if (!Directory.Exists(_dummyAssemblyDir))
         {
-            Console.WriteLine($"[ERR] Dummy assembly directory '{DummyAssemblyDir}' not found.");
+            Console.WriteLine($"[ERR] Dummy assembly directory '{_dummyAssemblyDir}' not found.");
             Console.WriteLine("Please provide a valid path using -dummydll or -d.");
             Environment.Exit(1);
         }
+
         if (!File.Exists(GameAssemblyPath))
         {
             Console.WriteLine($"[ERR] libil2cpp.so path '{GameAssemblyPath}' not found.");
@@ -38,96 +40,82 @@ public static class Parser
             Environment.Exit(1);
         }
 
-        DefaultAssemblyResolver resolver = new DefaultAssemblyResolver();
-        resolver.AddSearchDirectory(DummyAssemblyDir);
-        ReaderParameters readerParameters = new ReaderParameters();
-        readerParameters.AssemblyResolver = resolver;
+        var resolver = new DefaultAssemblyResolver();
+        resolver.AddSearchDirectory(_dummyAssemblyDir);
+        var readerParameters = new ReaderParameters
+        {
+            AssemblyResolver = resolver
+        };
         Console.WriteLine("Reading game assemblies...");
-        
-        string blueArchiveDllPath = Path.Combine(DummyAssemblyDir, "BlueArchive.dll");
+
+        var blueArchiveDllPath = Path.Combine(_dummyAssemblyDir, "BlueArchive.dll");
         if (!File.Exists(blueArchiveDllPath))
         {
-            Console.WriteLine($"[ERR] BlueArchive.dll not found in '{DummyAssemblyDir}'.");
+            Console.WriteLine($"[ERR] BlueArchive.dll not found in '{_dummyAssemblyDir}'.");
             Environment.Exit(1);
         }
-        AssemblyDefinition asm = AssemblyDefinition.ReadAssembly(blueArchiveDllPath, readerParameters);
 
-        string flatBuffersDllPath = Path.Combine(DummyAssemblyDir, "FlatBuffers.dll");
+        var asm = AssemblyDefinition.ReadAssembly(blueArchiveDllPath, readerParameters);
+
+        var flatBuffersDllPath = Path.Combine(_dummyAssemblyDir, "FlatBuffers.dll");
         if (!File.Exists(flatBuffersDllPath))
         {
-            Console.WriteLine($"[ERR] FlatBuffers.dll not found in '{DummyAssemblyDir}'.");
+            Console.WriteLine($"[ERR] FlatBuffers.dll not found in '{_dummyAssemblyDir}'.");
             Environment.Exit(1);
         }
-        AssemblyDefinition asmFBS = AssemblyDefinition.ReadAssembly(flatBuffersDllPath, readerParameters);
-        
-        flatBufferBuilder = new FlatBufferBuilder(asmFBS.MainModule);
-        TypeHelper typeHelper = new TypeHelper();
+
+        var asmFbs = AssemblyDefinition.ReadAssembly(flatBuffersDllPath, readerParameters);
+
+        FlatBufferBuilder = new FlatBufferBuilder(asmFbs.MainModule);
+        var typeHelper = new TypeHelper();
         Console.WriteLine("Getting a list of types...");
-        List<TypeDefinition> typeDefs = typeHelper.GetAllFlatBufferTypes(asm.MainModule, FlatBaseType);
-        FlatSchema schema = new FlatSchema();
-        int done = 0;
-        foreach (TypeDefinition typeDef in typeDefs)
+        var typeDefs = TypeHelper.GetAllFlatBufferTypes(asm.MainModule, FlatBaseType);
+        var schema = new FlatSchema();
+        var done = 0;
+        foreach (var typeDef in typeDefs)
         {
             Console.Write($"Disassembling types ({done + 1}/{typeDefs.Count})... \r");
-            FlatTable? table = typeHelper.Type2Table(typeDef);
+            var table = typeHelper.Type2Table(typeDef);
             if (table == null)
             {
                 Console.WriteLine($"[ERR] Error dumping table for {typeDef.FullName}");
                 continue;
             }
-            schema.flatTables.Add(table);
+
+            schema.FlatTables.Add(table);
             done += 1;
         }
-        Console.WriteLine($"Adding enums...");
-        foreach (TypeDefinition typeDef in flatEnumsToAdd)
-        {
-            FlatEnum? fEnum = TypeHelper.Type2Enum(typeDef);
-            if (fEnum == null)
-            {
-                Console.WriteLine($"[ERR] Error dumping enum for {typeDef.FullName}");
-                continue;
-            }
-            schema.flatEnums.Add(fEnum);
-        }
-        Console.WriteLine($"Writing schema to {OutputFileName}...");
-        File.WriteAllText(OutputFileName, SchemaToString(schema));
-        Console.WriteLine($"Done.");
+
+        Console.WriteLine("Adding enums...");
+        foreach (var fEnum in FlatEnumsToAdd.Select(TypeHelper.Type2Enum)) schema.FlatEnums.Add(fEnum);
+
+        Console.WriteLine($"Writing schema to {_outputFileName}...");
+        File.WriteAllText(_outputFileName, SchemaToString(schema));
+        Console.WriteLine("Done.");
     }
 
     private static string SchemaToString(FlatSchema schema)
     {
-        StringBuilder sb = new StringBuilder();
+        var sb = new StringBuilder();
 
-        if (!string.IsNullOrEmpty(CustomNameSpace))
-        {
-            sb.AppendLine($"namespace {CustomNameSpace};\n");
-        }
+        if (!string.IsNullOrEmpty(_customNameSpace)) sb.AppendLine($"namespace {_customNameSpace};\n");
 
-        foreach (FlatEnum flatEnum in schema.flatEnums)
-        {
-            sb.AppendLine(TableEnumToString(flatEnum));
-        }
+        foreach (var flatEnum in schema.FlatEnums) sb.AppendLine(TableEnumToString(flatEnum));
 
-        foreach (FlatTable table in schema.flatTables)
-        {
-            sb.AppendLine(TableToString(table));
-        }
+        foreach (var table in schema.FlatTables) sb.AppendLine(TableToString(table));
 
         return sb.ToString();
     }
 
     private static string TableToString(FlatTable table)
     {
-        StringBuilder sb = new StringBuilder();
-        sb.AppendLine($"table {table.tableName} {{");
+        var sb = new StringBuilder();
+        sb.AppendLine($"table {table.TableName} {{");
 
-        if (table.noCreate)
+        if (table.NoCreate)
             sb.AppendLine("\t// No Create method");
 
-        foreach (FlatField field in table.fields)
-        {
-            sb.AppendLine(TableFieldToString(field));
-        }
+        foreach (var field in table.Fields) sb.AppendLine(TableFieldToString(field));
 
         sb.AppendLine("}");
 
@@ -136,13 +124,13 @@ public static class Parser
 
     private static string TableEnumToString(FlatEnum fEnum)
     {
-        StringBuilder sb = new StringBuilder();
-        sb.AppendLine($"enum {fEnum.enumName} : {SystemToStringType(fEnum.type)} {{");
+        var sb = new StringBuilder();
+        sb.AppendLine($"enum {fEnum.EnumName} : {SystemToStringType(fEnum.Type)} {{");
 
-        for (int i = 0; i < fEnum.fields.Count; i++)
+        for (var i = 0; i < fEnum.Fields.Count; i++)
         {
-            FlatEnumField field = fEnum.fields[i];
-            sb.AppendLine(TableEnumFieldToString(field, i == fEnum.fields.Count-1));
+            var field = fEnum.Fields[i];
+            sb.AppendLine(TableEnumFieldToString(field, i == fEnum.Fields.Count - 1));
         }
 
         sb.AppendLine("}");
@@ -152,34 +140,34 @@ public static class Parser
 
     private static string TableEnumFieldToString(FlatEnumField field, bool isLast = false)
     {
-        return $"\t{field.name} = {field.value}{(isLast ? "" : ",")}";
+        return $"\t{field.Name} = {field.Value}{(isLast ? "" : ",")}";
     }
 
     private static string TableFieldToString(FlatField field)
     {
-        StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.Append($"\t{(ForceSnakeCase ? CamelToSnake(field.name) : field.name)}: ");
+        var stringBuilder = new StringBuilder();
+        stringBuilder.Append($"\t{(_forceSnakeCase ? CamelToSnake(field.Name) : field.Name)}: ");
 
-        string fieldType = SystemToStringType(field.type);
+        var fieldType = SystemToStringType(field.Type);
 
-        fieldType = field.isArray ? $"[{fieldType}]" : fieldType;
+        fieldType = field.IsArray ? $"[{fieldType}]" : fieldType;
 
-        stringBuilder.Append($"{fieldType}; // index 0x{field.offset:X}");
+        stringBuilder.Append($"{fieldType}; // index 0x{field.Offset:X}");
 
         return stringBuilder.ToString();
     }
 
-    static string CamelToSnake(string camelStr)
+    private static string CamelToSnake(string camelStr)
     {
-        bool isAllUppercase = camelStr.All(char.IsUpper);
+        var isAllUppercase = camelStr.All(char.IsUpper);
         if (string.IsNullOrEmpty(camelStr) || isAllUppercase)
             return camelStr;
-        return Regex.Replace(camelStr, @"(([a-z])(?=[A-Z][a-zA-Z])|([A-Z])(?=[A-Z][a-z]))", "$1_").ToLower();
+        return MyRegex().Replace(camelStr, "$1_").ToLower();
     }
 
-    public static string SystemToStringType(TypeDefinition field)
+    private static string SystemToStringType(TypeDefinition field)
     {
-        string fieldType = field.Name;
+        var fieldType = field.Name;
 
         switch (field.FullName)
         {
@@ -217,30 +205,30 @@ public static class Parser
                 fieldType = "uint8";
                 break;
             default:
-                if (fieldType.StartsWith("System."))
-                {
-                    Console.WriteLine($"[WARN] unknown system type {fieldType}");
-                }
+                if (fieldType.StartsWith("System.")) Console.WriteLine($"[WARN] unknown system type {fieldType}");
                 break;
         }
 
         return fieldType;
     }
+
+    [GeneratedRegex(@"(([a-z])(?=[A-Z][a-zA-Z])|([A-Z])(?=[A-Z][a-z]))")]
+    private static partial Regex MyRegex();
 }
 
 public class FlatBufferBuilder
 {
-    public long StartObject;
-    public long EndObject;
-    public Dictionary<long, MethodDefinition> methods;
+    public readonly long EndObject;
+    public readonly Dictionary<long, MethodDefinition> Methods;
+    public readonly long StartObject;
 
     public FlatBufferBuilder(ModuleDefinition flatBuffersDllModule)
     {
-        methods = new Dictionary<long, MethodDefinition>();
-        TypeDefinition FlatBufferBuilderType = flatBuffersDllModule.GetType("FlatBuffers.FlatBufferBuilder");
-        foreach (MethodDefinition method in FlatBufferBuilderType.Methods)
+        Methods = new Dictionary<long, MethodDefinition>();
+        var flatBufferBuilderType = flatBuffersDllModule.GetType("FlatBuffers.FlatBufferBuilder");
+        foreach (var method in flatBufferBuilderType.Methods)
         {
-            long rva = InstructionsParser.GetMethodRVA(method);
+            var rva = InstructionsParser.GetMethodRva(method);
             {
                 switch (method.Name)
                 {
@@ -250,12 +238,9 @@ public class FlatBufferBuilder
                     case "EndObject":
                         EndObject = rva;
                         break;
-                    default:
-                        // do nothing
-                        break;
                 }
             }
-            methods.Add(rva, method);
+            Methods.Add(rva, method);
         }
     }
 }

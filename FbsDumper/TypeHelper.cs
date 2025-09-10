@@ -1,4 +1,5 @@
-﻿using Mono.Cecil;
+﻿using System.Globalization;
+using Mono.Cecil;
 using Mono.Cecil.Rocks;
 using static FbsDumper.Parser;
 
@@ -6,38 +7,35 @@ namespace FbsDumper;
 
 internal class TypeHelper
 {
-    private InstructionsParser instructionsResolver = new InstructionsParser(Parser.GameAssemblyPath);
+    private readonly InstructionsParser _instructionsResolver = new(GameAssemblyPath);
 
-    public List<TypeDefinition> GetAllFlatBufferTypes(ModuleDefinition module, string baseTypeName)
+    public static List<TypeDefinition> GetAllFlatBufferTypes(ModuleDefinition module, string baseTypeName)
     {
         List<TypeDefinition> ret = module.GetTypes().Where(t =>
-            t.HasInterfaces &&
-            t.Interfaces.Any(i => i.InterfaceType.FullName == baseTypeName)
-			//  && t.FullName == "MX.Data.Excel.MinigameRoadPuzzleMapExcel"
-		).ToList();
+                t.HasInterfaces &&
+                t.Interfaces.Any(i => i.InterfaceType.FullName == baseTypeName)
+            //  && t.FullName == "MX.Data.Excel.MinigameRoadPuzzleMapExcel"
+        ).ToList();
 
-        if (!String.IsNullOrEmpty(Parser.NameSpace2LookFor))
-        {
-            ret = ret.Where(t => t.Namespace == Parser.NameSpace2LookFor).ToList();
-        }
+        if (!string.IsNullOrEmpty(NameSpace2LookFor)) ret = ret.Where(t => t.Namespace == NameSpace2LookFor).ToList();
 
         // Dedupe
-		ret = ret
-	        .GroupBy(t => t.Name)
-	        .Select(g => g.First())
-	        .ToList();
+        ret = ret
+            .GroupBy(t => t.Name)
+            .Select(g => g.First())
+            .ToList();
 
-		// todo: check nested types
+        // todo: check nested types
 
-		return ret;
+        return ret;
     }
 
-    public FlatTable? Type2Table(TypeDefinition targetType)
+    public FlatTable Type2Table(TypeDefinition targetType)
     {
-        string typeName = targetType.Name;
-        FlatTable ret = new FlatTable(typeName);
+        var typeName = targetType.Name;
+        var ret = new FlatTable(typeName);
 
-        MethodDefinition? createMethod = targetType.Methods.FirstOrDefault(m =>
+        var createMethod = targetType.Methods.FirstOrDefault(m =>
             m.Name == $"Create{typeName}" &&
             m.Parameters.Count > 1 &&
             m.Parameters.First().Name == "builder" &&
@@ -48,10 +46,10 @@ internal class TypeHelper
         if (createMethod == null)
         {
             // Console.WriteLine($"[ERR] {targetType.FullName} does NOT contain a Create{typeName} function. Fields will be empty");
-            ret.noCreate = true;
-			return ret;
+            ret.NoCreate = true;
+            return ret;
         }
-        
+
         ProcessFields(ref ret, createMethod, targetType);
 
         return ret;
@@ -59,16 +57,16 @@ internal class TypeHelper
 
     private void ProcessFields(ref FlatTable ret, MethodDefinition createMethod, TypeDefinition targetType)
     {
-        Dictionary<int, MethodDefinition> dict = ParseCalls4CreateMethod(createMethod, targetType);
+        var dict = ParseCalls4CreateMethod(createMethod, targetType);
         dict = dict.OrderBy(t => t.Key).ToDictionary();
 
-        foreach (KeyValuePair<int,MethodDefinition> kvp in dict)
+        foreach (var kvp in dict)
         {
-			MethodDefinition methodDef = kvp.Value;
-            ParameterDefinition param = methodDef.Parameters[1];
-            TypeDefinition fieldType = param.ParameterType.Resolve();
-            TypeReference fieldTypeRef = param.ParameterType;
-            string fieldName = param.Name;
+            var methodDef = kvp.Value;
+            var param = methodDef.Parameters[1];
+            var fieldType = param.ParameterType.Resolve();
+            var fieldTypeRef = param.ParameterType;
+            var fieldName = param.Name;
 
             if (fieldTypeRef is GenericInstanceType genericInstance)
             {
@@ -77,144 +75,140 @@ internal class TypeHelper
                 fieldTypeRef = genericInstance.GenericArguments.First();
             }
 
-            FlatField field = new FlatField(fieldType, fieldName.Replace("_", "")); // needed for BA
-            field.offset = kvp.Key;
+            var field = new FlatField(fieldType, fieldName.Replace("_", "")); // needed for BA
+            field.Offset = kvp.Key;
 
 
-			switch (fieldType.FullName)
+            switch (fieldType.FullName)
             {
                 case "FlatBuffers.StringOffset":
-                    field.type = targetType.Module.TypeSystem.String.Resolve();
-                    field.name = fieldName.EndsWith("Offset") ?
-                                    new string(fieldName.SkipLast("Offset".Length).ToArray()) :
-                                    fieldName;
-                    field.name = field.name.Replace("_", ""); // needed for BA
+                    field.Type = targetType.Module.TypeSystem.String.Resolve();
+                    field.Name = fieldName.EndsWith("Offset")
+                        ? new string(fieldName.SkipLast("Offset".Length).ToArray())
+                        : fieldName;
+                    field.Name = field.Name.Replace("_", ""); // needed for BA
                     break;
                 case "FlatBuffers.VectorOffset":
                 case "FlatBuffers.Offset":
-                    string newFieldName = fieldName.EndsWith("Offset") ?
-                                    new string(fieldName.SkipLast("Offset".Length).ToArray()) :
-                                    fieldName;
+                    var newFieldName = fieldName.EndsWith("Offset")
+                        ? new string(fieldName.SkipLast("Offset".Length).ToArray())
+                        : fieldName;
                     newFieldName = newFieldName.Replace("_", ""); // needed for BA
 
-                    MethodDefinition method = targetType.Methods.First(m =>
-                        m.Name.ToLower() == newFieldName.ToLower()
+                    var method = targetType.Methods.First(m =>
+                        m.Name.Equals(newFieldName, StringComparison.CurrentCultureIgnoreCase)
                     );
-                    TypeDefinition typeDefinition = method.ReturnType.Resolve();
-                    field.isArray = fieldType.FullName == "FlatBuffers.VectorOffset";
+                    var typeDefinition = method.ReturnType.Resolve();
+                    field.IsArray = fieldType.FullName == "FlatBuffers.VectorOffset";
                     fieldType = typeDefinition;
                     fieldTypeRef = method.ReturnType;
 
-                    field.type = typeDefinition;
-                    field.name = method.Name;
+                    field.Type = typeDefinition;
+                    field.Name = method.Name;
                     break;
-                default:
-                    break;
-
             }
 
             if (fieldTypeRef.IsGenericInstance)
             {
-                GenericInstanceType newGenericInstance = (GenericInstanceType)fieldTypeRef;
+                var newGenericInstance = (GenericInstanceType)fieldTypeRef;
                 fieldType = newGenericInstance.GenericArguments.First().Resolve();
                 fieldTypeRef = newGenericInstance.GenericArguments.First();
-                field.type = fieldType;
+                field.Type = fieldType;
             }
 
-            if (field.type.IsEnum && !Parser.flatEnumsToAdd.Contains(fieldType))
-            {
-                Parser.flatEnumsToAdd.Add(fieldType);
-            }
+            if (field.Type.IsEnum && !FlatEnumsToAdd.Contains(fieldType)) FlatEnumsToAdd.Add(fieldType);
 
-            ret.fields.Add(field);
+            ret.Fields.Add(field);
         }
-	}
+    }
 
-    public Dictionary<int, MethodDefinition> ParseCalls4CreateMethod(MethodDefinition createMethod, TypeDefinition targetType)
+    private Dictionary<int, MethodDefinition> ParseCalls4CreateMethod(MethodDefinition createMethod,
+        TypeDefinition targetType)
     {
-        Dictionary<int, MethodDefinition> ret = new Dictionary<int, MethodDefinition>();
-        Dictionary<long, MethodDefinition> typeMethods = new Dictionary<long, MethodDefinition>();
+        var ret = new Dictionary<int, MethodDefinition>();
+        var typeMethods = new Dictionary<long, MethodDefinition>();
 
-        foreach (MethodDefinition method in targetType.GetMethods())
+        foreach (var method in targetType.GetMethods())
         {
-            long rva = InstructionsParser.GetMethodRVA(method);
+            var rva = InstructionsParser.GetMethodRva(method);
             typeMethods.Add(rva, method);
         }
 
-		var instructions = instructionsResolver.GetInstructions(createMethod, false);
-		InstructionsAnalyzer processer = new InstructionsAnalyzer();
-		var calls = processer.AnalyzeCalls(instructions);
-		bool hasStarted = false;
-        int max = 0;
-        int cur = 0;
+        var instructions = _instructionsResolver.GetInstructions(createMethod);
+        var calls = InstructionsAnalyzer.AnalyzeCalls(instructions);
+        var hasStarted = false;
+        var max = 0;
+        var cur = 0;
 
-        MethodDefinition endMethod = targetType.Methods.First(m => m.Name == $"End{targetType.Name}");
-        long endMethodRVA = InstructionsParser.GetMethodRVA(endMethod);
+        var endMethod = targetType.Methods.First(m => m.Name == $"End{targetType.Name}");
+        var endMethodRva = InstructionsParser.GetMethodRva(endMethod);
 
-		foreach (var call in calls)
-		{
-            long target = long.Parse(call.Target.Substring(3), System.Globalization.NumberStyles.HexNumber);
-			switch (target)
+        foreach (var call in calls)
+        {
+            var target = long.Parse(call.Target?[3..]!, NumberStyles.HexNumber);
+            switch (target)
             {
-                case long addr when addr == flatBufferBuilder.StartObject:
+                case var addr when addr == Parser.FlatBufferBuilder.StartObject:
                     hasStarted = true;
-                    string arg1 = call.Args["w1"];
-					int cnt = arg1.StartsWith("#") ? int.Parse(arg1.Substring(3), System.Globalization.NumberStyles.HexNumber) : 0;
+                    var arg1 = call.Args["w1"];
+                    var cnt = arg1.StartsWith("#") ? int.Parse(arg1.Substring(3), NumberStyles.HexNumber) : 0;
                     max = cnt;
-					// Console.WriteLine($"Has started, instance will have {cnt} fields");
+                    // Console.WriteLine($"Has started, instance will have {cnt} fields");
                     break;
-				case long addr when addr == flatBufferBuilder.EndObject:
-					// Console.WriteLine($"Has ended");
-					return ret;
-                case long addr when addr == endMethodRVA:
-					// Console.WriteLine($"Stop");
-					return ret;
-				default:
+                case var addr when addr == Parser.FlatBufferBuilder.EndObject:
+                    // Console.WriteLine($"Has ended");
+                    return ret;
+                case var addr when addr == endMethodRva:
+                    // Console.WriteLine($"Stop");
+                    return ret;
+                default:
                     if (!hasStarted)
-                    {
                         Console.WriteLine($"Skipping call for 0x{target:X} because StartObject hasn't been called yet");
+                    if (!typeMethods.TryGetValue(target, out var method))
+                    {
+                        Console.WriteLine(
+                            $"Skipping call for 0x{target:X} because it's not part of the {targetType.FullName}");
+                        continue;
                     }
-                    if (!typeMethods.TryGetValue(target, out MethodDefinition? method) || method == null)
-					{
-						Console.WriteLine($"Skipping call for 0x{target:X} because it's not part of the {targetType.FullName}");
-						continue;
-                    }
+
                     if (cur >= max)
                     {
-						Console.WriteLine($"Skipping call for 0x{target:X} because max amount of fields has been reached");
-						continue;
-					}
-                    int index = ParseCalls4AddMethod(method, targetType);
+                        Console.WriteLine(
+                            $"Skipping call for 0x{target:X} because max amount of fields has been reached");
+                        continue;
+                    }
+
+                    var index = ParseCalls4AddMethod(method);
                     ret.Add(index, method);
                     cur += 1;
-					continue;
-			}
-		}
+                    continue;
+            }
+        }
 
         return ret;
-	}
-
-    public int ParseCalls4AddMethod(MethodDefinition createMethod, TypeDefinition targetType)
-    {
-		var instructions = instructionsResolver.GetInstructions(createMethod, false);
-		InstructionsAnalyzer processer = new InstructionsAnalyzer();
-        var calls = processer.AnalyzeCalls(instructions);
-        var call = calls.First(m => flatBufferBuilder.methods.ContainsKey(long.Parse(m.Target.Substring(3), System.Globalization.NumberStyles.HexNumber)));
-		string arg1 = call.Args["w1"];
-		int cnt = arg1.StartsWith("#") ? int.Parse(arg1.Substring(3), System.Globalization.NumberStyles.HexNumber) : 0;
-		// Console.WriteLine($"Index is {cnt}");
-		return cnt;
     }
 
-	public static FlatEnum Type2Enum(TypeDefinition typeDef)
+    private int ParseCalls4AddMethod(MethodDefinition createMethod)
     {
-        TypeDefinition retType = typeDef.GetEnumUnderlyingType().Resolve();
-        FlatEnum ret = new FlatEnum(retType, typeDef.Name);
+        var instructions = _instructionsResolver.GetInstructions(createMethod);
+        var calls = InstructionsAnalyzer.AnalyzeCalls(instructions);
+        var call = calls.First(m =>
+            Parser.FlatBufferBuilder.Methods.ContainsKey(long.Parse(m.Target?[3..]!, NumberStyles.HexNumber)));
+        var arg1 = call.Args["w1"];
+        var cnt = arg1.StartsWith('#') ? int.Parse(arg1[3..], NumberStyles.HexNumber) : 0;
+        // Console.WriteLine($"Index is {cnt}");
+        return cnt;
+    }
 
-        foreach (FieldDefinition fieldDef in typeDef.Fields.Where(f => f.HasConstant))
+    public static FlatEnum Type2Enum(TypeDefinition typeDef)
+    {
+        var retType = typeDef.GetEnumUnderlyingType().Resolve();
+        var ret = new FlatEnum(retType, typeDef.Name);
+
+        foreach (var fieldDef in typeDef.Fields.Where(f => f.HasConstant))
         {
-            FlatEnumField enumField = new FlatEnumField(fieldDef.Name, Convert.ToInt64(fieldDef.Constant));
-            ret.fields.Add(enumField);
+            var enumField = new FlatEnumField(fieldDef.Name, Convert.ToInt64(fieldDef.Constant));
+            ret.Fields.Add(enumField);
         }
 
         return ret;
