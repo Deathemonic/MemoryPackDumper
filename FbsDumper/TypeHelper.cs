@@ -39,8 +39,7 @@ internal class TypeHelper
             m.Name == $"Create{typeName}" &&
             m.Parameters.Count > 1 &&
             m.Parameters.First().Name == "builder" &&
-            m.IsStatic &&
-            m.IsPublic
+            m is { IsStatic: true, IsPublic: true }
         );
 
         if (createMethod == null)
@@ -75,8 +74,10 @@ internal class TypeHelper
                 fieldTypeRef = genericInstance.GenericArguments.First();
             }
 
-            var field = new FlatField(fieldType, fieldName.Replace("_", "")); // needed for BA
-            field.Offset = kvp.Key;
+            var field = new FlatField(fieldType, fieldName.Replace("_", ""))
+            {
+                Offset = kvp.Key
+            }; // needed for BA
 
 
             switch (fieldType.FullName)
@@ -151,7 +152,7 @@ internal class TypeHelper
                 case var addr when addr == Parser.FlatBufferBuilder.StartObject:
                     hasStarted = true;
                     var arg1 = call.Args["w1"];
-                    var cnt = arg1.StartsWith("#") ? int.Parse(arg1.Substring(3), NumberStyles.HexNumber) : 0;
+                    var cnt = arg1.StartsWith('#') ? int.Parse(arg1.Substring(3), NumberStyles.HexNumber) : 0;
                     max = cnt;
                     // Console.WriteLine($"Has started, instance will have {cnt} fields");
                     break;
