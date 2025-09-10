@@ -1,12 +1,12 @@
 ﻿using Mono.Cecil;
 using Mono.Cecil.Rocks;
-using static FbsDumper.MainApp;
+using static FbsDumper.Parser;
 
 namespace FbsDumper;
 
 internal class TypeHelper
 {
-    private InstructionsParser instructionsResolver = new InstructionsParser(MainApp.GameAssemblyPath);
+    private InstructionsParser instructionsResolver = new InstructionsParser(Parser.GameAssemblyPath);
 
     public List<TypeDefinition> GetAllFlatBufferTypes(ModuleDefinition module, string baseTypeName)
     {
@@ -16,9 +16,9 @@ internal class TypeHelper
 			//  && t.FullName == "MX.Data.Excel.MinigameRoadPuzzleMapExcel"
 		).ToList();
 
-        if (!String.IsNullOrEmpty(MainApp.NameSpace2LookFor))
+        if (!String.IsNullOrEmpty(Parser.NameSpace2LookFor))
         {
-            ret = ret.Where(t => t.Namespace == MainApp.NameSpace2LookFor).ToList();
+            ret = ret.Where(t => t.Namespace == Parser.NameSpace2LookFor).ToList();
         }
 
         // Dedupe
@@ -121,9 +121,9 @@ internal class TypeHelper
                 field.type = fieldType;
             }
 
-            if (field.type.IsEnum && !MainApp.flatEnumsToAdd.Contains(fieldType))
+            if (field.type.IsEnum && !Parser.flatEnumsToAdd.Contains(fieldType))
             {
-                MainApp.flatEnumsToAdd.Add(fieldType);
+                Parser.flatEnumsToAdd.Add(fieldType);
             }
 
             ret.fields.Add(field);

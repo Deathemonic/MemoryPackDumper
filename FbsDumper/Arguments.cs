@@ -1,0 +1,24 @@
+namespace FbsDumper;
+
+public static class Args
+{
+    /// <summary>
+    /// FlatBuffer Schema Dumper
+    /// </summary>
+    /// <param name="dummyDll">-d, Specifies the dummy DLL directory.</param>
+    /// <param name="gameAssembly">-a, Specifies the path to libil2cpp.so.</param>
+    /// <param name="outputFile">-o, Specifies the output file.</param>
+    /// <param name="namespace">-n, Specifies the flatdata namespace</param>
+    /// <param name="forceSnakeCase">-s, Force snake case.</param>
+    /// <param name="namespaceToLookFor">-nl, Specifies the namespace to look for</param>
+    public static void Run(
+        string dummyDll,
+        string gameAssembly,
+        string outputFile = "BlueArchive.fbs",
+        string @namespace = "FlatData",
+        bool forceSnakeCase = false,
+        string? namespaceToLookFor = null)
+    {
+        Parser.Execute(dummyDll, gameAssembly, outputFile, @namespace, forceSnakeCase, namespaceToLookFor);
+    }
+}
