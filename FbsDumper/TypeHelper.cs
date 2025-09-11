@@ -11,19 +11,18 @@ internal class TypeHelper
 
     public static List<TypeDefinition> GetAllFlatBufferTypes(ModuleDefinition module, string baseTypeName)
     {
-        List<TypeDefinition> ret = module.GetTypes().Where(t =>
+        List<TypeDefinition> ret = [.. module.GetTypes().Where(t =>
                 t.HasInterfaces &&
                 t.Interfaces.Any(i => i.InterfaceType.FullName == baseTypeName)
             //  && t.FullName == "MX.Data.Excel.MinigameRoadPuzzleMapExcel"
-        ).ToList();
+        )];
 
         if (!string.IsNullOrEmpty(NameSpace2LookFor)) ret = ret.Where(t => t.Namespace == NameSpace2LookFor).ToList();
 
         // Dedupe
-        ret = ret
+        ret = [.. ret
             .GroupBy(t => t.Name)
-            .Select(g => g.First())
-            .ToList();
+            .Select(g => g.First())];
 
         // todo: check nested types
 
@@ -44,7 +43,8 @@ internal class TypeHelper
 
         if (createMethod == null)
         {
-            // Console.WriteLine($"[ERR] {targetType.FullName} does NOT contain a Create{typeName} function. Fields will be empty");
+            Log.Warning($"{targetType.FullName} does NOT contain a Create{typeName} function. Fields will be empty");
+            
             ret.NoCreate = true;
             return ret;
         }
@@ -152,30 +152,28 @@ internal class TypeHelper
                 case var addr when addr == Parser.FlatBufferBuilder.StartObject:
                     hasStarted = true;
                     var arg1 = call.Args["w1"];
-                    var cnt = arg1.StartsWith('#') ? int.Parse(arg1.Substring(3), NumberStyles.HexNumber) : 0;
+                    var cnt = arg1.StartsWith('#') ? int.Parse(arg1[3..], NumberStyles.HexNumber) : 0;
                     max = cnt;
-                    // Console.WriteLine($"Has started, instance will have {cnt} fields");
+                    Log.Debug($"Has started, instance will have {cnt} fields");
                     break;
                 case var addr when addr == Parser.FlatBufferBuilder.EndObject:
-                    // Console.WriteLine($"Has ended");
+                    Log.Debug("Has ended");
                     return ret;
                 case var addr when addr == endMethodRva:
-                    // Console.WriteLine($"Stop");
+                    Log.Debug("Stop");
                     return ret;
                 default:
                     if (!hasStarted)
-                        Console.WriteLine($"Skipping call for 0x{target:X} because StartObject hasn't been called yet");
+                        Log.Global.LogSkippingCall((ulong)target, "StartObject hasn't been called yet");
                     if (!typeMethods.TryGetValue(target, out var method))
                     {
-                        Console.WriteLine(
-                            $"Skipping call for 0x{target:X} because it's not part of the {targetType.FullName}");
+                        Log.Global.LogSkippingCall((ulong)target, $"it's not part of the {targetType.FullName}");
                         continue;
                     }
 
                     if (cur >= max)
                     {
-                        Console.WriteLine(
-                            $"Skipping call for 0x{target:X} because max amount of fields has been reached");
+                        Log.Global.LogSkippingCall((ulong)target, "max amount of fields has been reached");
                         continue;
                     }
 
@@ -197,7 +195,9 @@ internal class TypeHelper
             Parser.FlatBufferBuilder.Methods.ContainsKey(long.Parse(m.Target?[3..]!, NumberStyles.HexNumber)));
         var arg1 = call.Args["w1"];
         var cnt = arg1.StartsWith('#') ? int.Parse(arg1[3..], NumberStyles.HexNumber) : 0;
-        // Console.WriteLine($"Index is {cnt}");
+
+        Log.Debug($"Index is {cnt}");
+        
         return cnt;
     }
 

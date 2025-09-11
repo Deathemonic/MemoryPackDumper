@@ -11,14 +11,18 @@ public static class Args
     /// <param name="namespace">-n, Specifies the flatdata namespace</param>
     /// <param name="forceSnakeCase">-s, Force snake case.</param>
     /// <param name="namespaceToLookFor">-nl, Specifies the namespace to look for</param>
+    /// <param name="verbose">-v, Enable verbose debug logging.</param>
+    /// <param name="suppressWarnings">-sw, Suppress warning messages.</param>
     public static void Run(
         string dummyDll,
         string gameAssembly,
         string outputFile = "BlueArchive.fbs",
         string @namespace = "FlatData",
         bool forceSnakeCase = false,
-        string? namespaceToLookFor = null)
+        string? namespaceToLookFor = null,
+        bool verbose = false,
+        bool suppressWarnings = false)
     {
-        Parser.Execute(dummyDll, gameAssembly, outputFile, @namespace, forceSnakeCase, namespaceToLookFor);
+        Parser.Execute(dummyDll, gameAssembly, outputFile, @namespace, forceSnakeCase, namespaceToLookFor, verbose, suppressWarnings);
     }
 }

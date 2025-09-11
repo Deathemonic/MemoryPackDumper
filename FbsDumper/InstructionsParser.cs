@@ -12,7 +12,9 @@ internal class InstructionsParser(string gameAssemblyPath)
     {
         var rva = GetMethodRva(targetMethod);
         if (rva != 0) return GetInstructions(rva, debug);
-        Console.WriteLine($"[!] Invalid RVA or offset for method: {targetMethod.FullName}");
+        
+        Log.Warning($"Invalid RVA or offset for method: {targetMethod.FullName}");
+        
         return [];
     }
 
@@ -22,6 +24,7 @@ internal class InstructionsParser(string gameAssemblyPath)
 
         using var capstone = CapstoneDisassembler.CreateArm64Disassembler(Arm64DisassembleMode.LittleEndian);
         capstone.EnableInstructionDetails = true;
+        
         const int instrSize = 4;
         var currentOffset = rva;
 
@@ -38,7 +41,9 @@ internal class InstructionsParser(string gameAssemblyPath)
             instructions.Add(instr);
 
             if (debug)
-                Console.WriteLine($"\t0x{instr.Address:X}: {instr.Mnemonic} {instr.Operand}");
+            {
+                Log.Global.LogInstruction((ulong)instr.Address, instr.Mnemonic, instr.Operand);
+            }
 
             currentOffset += instrSize;
 

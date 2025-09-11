@@ -15,10 +15,18 @@ public static partial class Parser
     private static readonly string FlatBaseType = "FlatBuffers.IFlatbufferObject";
     public static FlatBufferBuilder FlatBufferBuilder = null!;
     public static readonly List<TypeDefinition> FlatEnumsToAdd = [];
+    public static bool SuppressWarnings;
 
     public static void Execute(string dummyDll, string gameAssembly, string outputFile, string nameSpace,
-        bool forceSnakeCase, string? namespaceToLookFor)
+        bool forceSnakeCase, string? namespaceToLookFor, bool verbose, bool suppressWarnings)
     {
+        if (verbose)
+        {
+            Log.EnableDebugLogging();
+        }
+        
+        SuppressWarnings = suppressWarnings;
+        
         _dummyAssemblyDir = dummyDll;
         GameAssemblyPath = gameAssembly;
         _outputFileName = outputFile;
@@ -28,15 +36,17 @@ public static partial class Parser
 
         if (!Directory.Exists(_dummyAssemblyDir))
         {
-            Console.WriteLine($"[ERR] Dummy assembly directory '{_dummyAssemblyDir}' not found.");
-            Console.WriteLine("Please provide a valid path using -dummydll or -d.");
+            Log.Global.LogDummyDirNotFound(_dummyAssemblyDir);
+            Log.Error("Please provide a valid path using -dummydll or -d.");
+            Log.Shutdown();
             Environment.Exit(1);
         }
 
         if (!File.Exists(GameAssemblyPath))
         {
-            Console.WriteLine($"[ERR] libil2cpp.so path '{GameAssemblyPath}' not found.");
-            Console.WriteLine("Please provide a valid path using -gameassembly or -a.");
+            Log.Global.LogGameAssemblyNotFound(GameAssemblyPath);
+            Log.Error("Please provide a valid path using -gameassembly or -a.");
+            Log.Shutdown();
             Environment.Exit(1);
         }
 
@@ -46,12 +56,13 @@ public static partial class Parser
         {
             AssemblyResolver = resolver
         };
-        Console.WriteLine("Reading game assemblies...");
+        Log.Info("Reading game assemblies...");
 
         var blueArchiveDllPath = Path.Combine(_dummyAssemblyDir, "BlueArchive.dll");
         if (!File.Exists(blueArchiveDllPath))
         {
-            Console.WriteLine($"[ERR] BlueArchive.dll not found in '{_dummyAssemblyDir}'.");
+            Log.Global.LogFileNotFound("BlueArchive.dll", _dummyAssemblyDir);
+            Log.Shutdown();
             Environment.Exit(1);
         }
 
@@ -60,7 +71,8 @@ public static partial class Parser
         var flatBuffersDllPath = Path.Combine(_dummyAssemblyDir, "FlatBuffers.dll");
         if (!File.Exists(flatBuffersDllPath))
         {
-            Console.WriteLine($"[ERR] FlatBuffers.dll not found in '{_dummyAssemblyDir}'.");
+            Log.Global.LogFileNotFound("FlatBuffers.dll", _dummyAssemblyDir);
+            Log.Shutdown();
             Environment.Exit(1);
         }
 
@@ -68,30 +80,25 @@ public static partial class Parser
 
         FlatBufferBuilder = new FlatBufferBuilder(asmFbs.MainModule);
         var typeHelper = new TypeHelper();
-        Console.WriteLine("Getting a list of types...");
+        Log.Info("Getting a list of types...");
         var typeDefs = TypeHelper.GetAllFlatBufferTypes(asm.MainModule, FlatBaseType);
         var schema = new FlatSchema();
         var done = 0;
         foreach (var typeDef in typeDefs)
         {
-            Console.Write($"Disassembling types ({done + 1}/{typeDefs.Count})... \r");
+            Log.Global.LogProgress(done + 1, typeDefs.Count);
             var table = typeHelper.Type2Table(typeDef);
-            if (table == null)
-            {
-                Console.WriteLine($"[ERR] Error dumping table for {typeDef.FullName}");
-                continue;
-            }
 
             schema.FlatTables.Add(table);
             done += 1;
         }
 
-        Console.WriteLine("Adding enums...");
+        Log.Info("Adding enums...");
         foreach (var fEnum in FlatEnumsToAdd.Select(TypeHelper.Type2Enum)) schema.FlatEnums.Add(fEnum);
 
-        Console.WriteLine($"Writing schema to {_outputFileName}...");
+        Log.Info($"Writing schema to {_outputFileName}...");
         File.WriteAllText(_outputFileName, SchemaToString(schema));
-        Console.WriteLine("Done.");
+        Log.Info("Done.");
     }
 
     private static string SchemaToString(FlatSchema schema)
@@ -205,7 +212,10 @@ public static partial class Parser
                 fieldType = "uint8";
                 break;
             default:
-                if (fieldType.StartsWith("System.")) Console.WriteLine($"[WARN] unknown system type {fieldType}");
+                if (fieldType.StartsWith("System.")) 
+                {
+                    Log.Global.LogUnknownSystemType(fieldType);
+                }
                 break;
         }
 

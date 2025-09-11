@@ -22,6 +22,8 @@ FbsDumper.exe --help
 - `-n, --namespace`: Specifies the flatdata namespace (Default: FlatData)
 - `-s, --force-snake-case`: Force snake case conversion
 - `-nl, --namespace-to-look-for`: Specifies the namespace to look for
+- `-v, --verbose`: Enable verbose debug logging
+- `-sw, --suppress-warnings`: Suppress warning messages
 
 ## TODO
 - Default values support
