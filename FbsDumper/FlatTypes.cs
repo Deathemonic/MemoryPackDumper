@@ -1,71 +1,40 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using Mono.Cecil;
+﻿using Mono.Cecil;
 using Newtonsoft.Json;
 
 namespace FbsDumper;
 
 public class FlatSchema
 {
-    public List<FlatEnum> flatEnums = new List<FlatEnum>();
-    public List<FlatTable> flatTables = new List<FlatTable>();
+    public readonly List<FlatEnum> FlatEnums = [];
+    public readonly List<FlatTable> FlatTables = [];
 }
 
-public class FlatTable
+public class FlatTable(string tableName)
 {
-    public bool noCreate = false;
-    public string tableName;
-    public List<FlatField> fields = new List<FlatField>();
-
-    public FlatTable(string tableName)
-    {
-        this.tableName = tableName;
-    }
+    public readonly List<FlatField> Fields = [];
+    public bool NoCreate = false;
+    public readonly string TableName = tableName;
 }
 
-public class FlatField
+public class FlatField(TypeDefinition type, string name, bool isArray = false)
 {
-    [JsonIgnore]
-    public TypeDefinition type;
-    public string Type => type.FullName;
+    public bool IsArray = isArray;
+    public string Name = name;
+    public int Offset;
 
-    public bool isArray;
-    public string name;
-	public int offset;
-
-	public FlatField(TypeDefinition type, string name, bool isArray = false)
-    {
-        this.type = type;
-        this.name = name;
-        this.isArray = isArray;
-    }
+    [JsonIgnore] public TypeDefinition Type = type;
 }
 
-public class FlatEnum
+public class FlatEnum(TypeDefinition valueType, string enumName)
 {
-    [JsonIgnore]
-    public TypeDefinition type;
-    public string Type => type.FullName;
+    public readonly string EnumName = enumName;
+    public readonly List<FlatEnumField> Fields = [];
 
-    public string enumName;
-    public List<FlatEnumField> fields = new List<FlatEnumField>();
-
-    public FlatEnum(TypeDefinition valueType, string enumName)
-    {
-        this.type = valueType;
-        this.enumName = enumName;
-    }
+    [JsonIgnore] public readonly TypeDefinition Type = valueType;
 }
 
-public class FlatEnumField
+public class FlatEnumField(string name, long value = 0)
 {
-    public string name;
-    public long value;
-
-    public FlatEnumField(string name, long value = 0)
-    { 
-        this.name = name;
-        this.value = value;
-    }
+    public readonly string Name = name;
+    public readonly long Value = value;
 }

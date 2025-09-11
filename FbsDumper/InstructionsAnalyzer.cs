@@ -1,73 +1,79 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using Gee.External.Capstone;
-using Gee.External.Capstone.Arm64;
+﻿using Gee.External.Capstone.Arm64;
 
 namespace FbsDumper;
 
-internal class InstructionsAnalyzer
+internal abstract class InstructionsAnalyzer
 {
+    public static List<ArmCallInfo> AnalyzeCalls(List<Arm64Instruction> instructions)
+    {
+        var result = new List<ArmCallInfo>();
+        var regState = new Dictionary<string, string>();
 
-	public class ArmCallInfo
-	{
-		public ulong Address;
-		public string Target;
-		public Dictionary<string, string> Args = new();
-	}
+        foreach (var instr in instructions)
+        {
+            var mnemonic = instr.Mnemonic;
+            var ops =
+                instr.Operand?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ??
+                [];
 
-	public List<ArmCallInfo> AnalyzeCalls(List<Arm64Instruction> instructions)
-	{
-		var result = new List<ArmCallInfo>();
-		var regState = new Dictionary<string, string>();
+            switch (mnemonic)
+            {
+                case "mov":
+                case "movz":
+                {
+                    if (ops.Length == 2) regState[ops[0]] = ops[1];
+                    break;
+                }
+                case "movk":
+                case "movn":
+                {
+                    if (ops.Length >= 1)
+                        regState[ops[0]] = $"<{mnemonic}>";
+                    break;
+                }
+                case "bl":
+                case "b":
+                {
+                    var call = new ArmCallInfo
+                    {
+                        Address = (ulong)instr.Address,
+                        Target = ops.Length > 0 ? ops[0] : "<unknown>",
+                        Args = []
+                    };
 
-		foreach (var instr in instructions)
-		{
-			string mnemonic = instr.Mnemonic;
-			string[] ops = instr.Operand?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? Array.Empty<string>();
+                    for (var i = 0; i <= 7; i++)
+                    {
+                        var xReg = $"x{i}";
+                        var wReg = $"w{i}";
 
-			if (mnemonic == "mov" || mnemonic == "movz")
-			{
-				if (ops.Length == 2)
-				{
-					regState[ops[0]] = ops[1];
-				}
-			}
-			else if (mnemonic == "movk" || mnemonic == "movn")
-			{
-				if (ops.Length >= 1)
-					regState[ops[0]] = $"<{mnemonic}>";
-			}
-			else if (mnemonic == "bl" || mnemonic == "b")
-			{
-				var call = new ArmCallInfo
-				{
-					Address = (ulong)instr.Address,
-					Target = ops.Length > 0 ? ops[0] : "<unknown>",
-					Args = new Dictionary<string, string>()
-				};
+                        if (regState.TryGetValue(xReg, out var value))
+                            call.Args[xReg] = value;
+                        else if (regState.TryGetValue(wReg, out var value2))
+                            call.Args[wReg] = value2;
+                    }
 
-				for (int i = 0; i <= 7; i++)
-				{
-					string xReg = $"x{i}";
-					string wReg = $"w{i}";
+                    result.Add(call);
+                    break;
+                }
+                default:
+                {
+                    if (mnemonic == "cbz" || mnemonic == "cmp" || mnemonic.StartsWith('b'))
+                    {
+                        // not handle for now
+                    }
 
-					if (regState.ContainsKey(xReg))
-						call.Args[xReg] = regState[xReg];
-					else if (regState.ContainsKey(wReg))
-						call.Args[wReg] = regState[wReg];
-				}
+                    break;
+                }
+            }
+        }
 
-				result.Add(call);
-			}
-			else if (mnemonic == "cbz" || mnemonic == "cmp" || mnemonic.StartsWith("b"))
-			{
-				// not handle for now
-			}
-		}
+        return result;
+    }
 
-		return result;
-	}
-
+    public class ArmCallInfo
+    {
+        public ulong Address;
+        public Dictionary<string, string> Args = [];
+        public string? Target;
+    }
 }

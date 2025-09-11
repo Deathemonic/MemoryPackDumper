@@ -1,77 +1,71 @@
-﻿using Mono.Cecil;
-using Gee.External.Capstone;
+﻿using Gee.External.Capstone;
 using Gee.External.Capstone.Arm64;
+using Mono.Cecil;
 
 namespace FbsDumper;
 
-internal class InstructionsParser
+internal class InstructionsParser(string gameAssemblyPath)
 {
-	string gameAssemblyPath;
-	byte[] fileBytes;
+    private readonly byte[] _fileBytes = File.ReadAllBytes(gameAssemblyPath);
 
-	public InstructionsParser(string _gameAssemblyPath)
-	{
-		gameAssemblyPath = _gameAssemblyPath;
-		fileBytes = File.ReadAllBytes(gameAssemblyPath);
-	}
+    public List<Arm64Instruction> GetInstructions(MethodDefinition targetMethod, bool debug = false)
+    {
+        var rva = GetMethodRva(targetMethod);
+        if (rva != 0) return GetInstructions(rva, debug);
+        
+        Log.Warning($"Invalid RVA or offset for method: {targetMethod.FullName}");
+        
+        return [];
+    }
 
-	public List<Arm64Instruction> GetInstructions(MethodDefinition targetMethod, bool debug = false)
-	{
-		long rva = GetMethodRVA(targetMethod);
-		if (rva == 0)
-		{
-			Console.WriteLine($"[!] Invalid RVA or offset for method: {targetMethod.FullName}");
-			return new List<Arm64Instruction>();
-		}
+    private List<Arm64Instruction> GetInstructions(long rva, bool debug = false)
+    {
+        var instructions = new List<Arm64Instruction>();
 
-		return GetInstructions(rva, debug);
-	}
+        using var capstone = CapstoneDisassembler.CreateArm64Disassembler(Arm64DisassembleMode.LittleEndian);
+        capstone.EnableInstructionDetails = false;
+        
+        const int instrSize = 4;
+        var currentOffset = rva;
 
-	public List<Arm64Instruction> GetInstructions(long RVA, bool debug = false)
-	{
-		var instructions = new List<Arm64Instruction>();
+        while (currentOffset + instrSize <= _fileBytes.Length)
+        {
+            var instrBytes = new byte[instrSize];
+            Array.Copy(_fileBytes, currentOffset, instrBytes, 0, instrSize);
 
-		using var capstone = CapstoneDisassembler.CreateArm64Disassembler(Arm64DisassembleMode.LittleEndian);
-		capstone.EnableInstructionDetails = true;
-		const int instrSize = 4;
-		long currentOffset = RVA;
+            var decoded = capstone.Disassemble(instrBytes, currentOffset);
+            if (decoded.Length == 0)
+                break;
 
-		while (currentOffset + instrSize <= fileBytes.Length)
-		{
-			var instrBytes = new byte[instrSize];
-			Array.Copy(fileBytes, currentOffset, instrBytes, 0, instrSize);
+            var instr = decoded[0];
+            instructions.Add(instr);
 
-			var decoded = capstone.Disassemble(instrBytes, currentOffset);
-			if (decoded.Length == 0)
-				break;
+            if (debug)
+            {
+                Log.Global.LogInstruction((ulong)instr.Address, instr.Mnemonic, instr.Operand);
+            }
 
-			var instr = decoded[0];
-			instructions.Add(instr);
+            currentOffset += instrSize;
 
-			if (debug)
-				Console.WriteLine($"\t0x{instr.Address:X}: {instr.Mnemonic} {instr.Operand}");
+            if (instr.Mnemonic == "ret")
+                break;
+        }
 
-			currentOffset += instrSize;
-
-			if (instr.Mnemonic == "ret")
-				break;
-		}
-
-		return instructions;
-	}
+        return instructions;
+    }
 
 
-	public static long GetMethodRVA(MethodDefinition method)
-	{
-		if (!method.HasCustomAttributes)
-			return 0;
+    public static long GetMethodRva(MethodDefinition method)
+    {
+        if (!method.HasCustomAttributes)
+            return 0;
 
-		var customAttr = method.CustomAttributes.FirstOrDefault(a => a.AttributeType.Name == "AddressAttribute");
-		if (customAttr == null || !customAttr.HasFields)
-			return 0;
+        var customAttr = method.CustomAttributes.FirstOrDefault(a => a.AttributeType.Name == "AddressAttribute");
+        if (customAttr is not { HasFields: true })
+            return 0;
 
-		var argRVA = customAttr.Fields.First(f => f.Name == "RVA");
-		long rva = Convert.ToInt64(argRVA.Argument.Value.ToString()?.Substring(2), 16);
-		return rva;
-	}
+        var argRva = customAttr.Fields.First(f => f.Name == "RVA");
+        var rva = Convert.ToInt64(argRva.Argument.Value.ToString()?[2..], 16);
+        return rva;
+    }
 }
