@@ -38,7 +38,7 @@ internal abstract class InstructionsAnalyzer
                     {
                         Address = (ulong)instr.Address,
                         Target = ops.Length > 0 ? ops[0] : "<unknown>",
-                        Args = new Dictionary<string, string>()
+                        Args = []
                     };
 
                     for (var i = 0; i <= 7; i++)
@@ -57,7 +57,7 @@ internal abstract class InstructionsAnalyzer
                 }
                 default:
                 {
-                    if (mnemonic == "cbz" || mnemonic == "cmp" || mnemonic.StartsWith("b"))
+                    if (mnemonic == "cbz" || mnemonic == "cmp" || mnemonic.StartsWith('b'))
                     {
                         // not handle for now
                     }
@@ -73,7 +73,7 @@ internal abstract class InstructionsAnalyzer
     public class ArmCallInfo
     {
         public ulong Address;
-        public Dictionary<string, string> Args = new();
+        public Dictionary<string, string> Args = [];
         public string? Target;
     }
 }

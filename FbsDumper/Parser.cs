@@ -234,7 +234,7 @@ public class FlatBufferBuilder
 
     public FlatBufferBuilder(ModuleDefinition flatBuffersDllModule)
     {
-        Methods = new Dictionary<long, MethodDefinition>();
+        Methods = [];
         var flatBufferBuilderType = flatBuffersDllModule.GetType("FlatBuffers.FlatBufferBuilder");
         foreach (var method in flatBufferBuilderType.Methods)
         {

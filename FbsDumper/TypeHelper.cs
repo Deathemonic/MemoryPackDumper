@@ -85,14 +85,14 @@ internal class TypeHelper
                 case "FlatBuffers.StringOffset":
                     field.Type = targetType.Module.TypeSystem.String.Resolve();
                     field.Name = fieldName.EndsWith("Offset")
-                        ? new string(fieldName.SkipLast("Offset".Length).ToArray())
+                        ? new string([.. fieldName.SkipLast("Offset".Length)])
                         : fieldName;
                     field.Name = field.Name.Replace("_", ""); // needed for BA
                     break;
                 case "FlatBuffers.VectorOffset":
                 case "FlatBuffers.Offset":
                     var newFieldName = fieldName.EndsWith("Offset")
-                        ? new string(fieldName.SkipLast("Offset".Length).ToArray())
+                        ? new string([.. fieldName.SkipLast("Offset".Length)])
                         : fieldName;
                     newFieldName = newFieldName.Replace("_", ""); // needed for BA
 
