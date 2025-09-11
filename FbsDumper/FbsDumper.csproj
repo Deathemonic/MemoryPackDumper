@@ -8,6 +8,9 @@
     <Nullable>enable</Nullable>
     <PublishAot>true</PublishAot>
     <SelfContained>true</SelfContained>
+    
+    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+    <NoWarn>$(NoWarn);IL2104;IL3053</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
