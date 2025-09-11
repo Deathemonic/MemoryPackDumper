@@ -1,7 +1,7 @@
 # FbsDumper
 A tool to recover FlatBuffer schema definitions from game assemblies using assembly instruction parsing.
 
-Originally made for Blue Archive, should theoretically work with other games but is untested.
+Originally made for **Blue Archive**, should theoretically work with other games but is untested.
 
 ## Usage
 ```bash

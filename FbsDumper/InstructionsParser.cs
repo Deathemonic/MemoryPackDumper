@@ -23,7 +23,7 @@ internal class InstructionsParser(string gameAssemblyPath)
         var instructions = new List<Arm64Instruction>();
 
         using var capstone = CapstoneDisassembler.CreateArm64Disassembler(Arm64DisassembleMode.LittleEndian);
-        capstone.EnableInstructionDetails = true;
+        capstone.EnableInstructionDetails = false;
         
         const int instrSize = 4;
         var currentOffset = rva;
