@@ -21,11 +21,11 @@ jobs:
             rid: win-x64
           - os: macos
             arch: x86_64
-            runner: macos-13
+            runner: macos-15
             rid: osx-x64
           - os: macos
             arch: aarch64
-            runner: macos-latest
+            runner: macos-15
             rid: osx-arm64
           - os: linux
             arch: x86_64
