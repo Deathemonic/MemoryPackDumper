@@ -33,7 +33,7 @@ jobs:
             rid: linux-x64
           - os: linux
             arch: aarch64
-            runner: ubuntu-latest
+            runner: ubuntu-24.04-arm
             rid: linux-arm64
 
     steps:
@@ -44,10 +44,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-
-      - name: Install ARM64 linker on Linux
-        if: matrix.rid == 'linux-arm64'
-        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
 
       - name: Restore dependencies
         run: dotnet restore
