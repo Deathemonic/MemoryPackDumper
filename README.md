@@ -6,7 +6,7 @@ Originally made for **Blue Archive**, should theoretically work with other games
 ## Usage
 ```bash
 # Build the project
-dotnet build
+dotnet publish --configuration Release
 
 # Run with required parameters
 FbsDumper.exe --dummy-dll "path/to/DummyDll" --game-assembly "path/to/libil2cpp.so"
@@ -29,6 +29,6 @@ FbsDumper.exe --help
 - Default values support
 
 > [!IMPORTANT]  
-> **Disclaimer:** This software is made 100% for educational purposes only. I do not claim any responsibility for any usage of this software.
+> **Disclaimer:** This software is made solely for educational purposes. I do not claim any responsibility for any usage of this software.
 
 Copyright© Hiro420
