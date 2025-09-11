@@ -49,13 +49,13 @@ jobs:
         run: dotnet restore
 
       - name: Build
-        run: dotnet build --project FbsDumper/FbsDumper.csproj --configuration Release --no-restore
+        run: dotnet build FbsDumper/FbsDumper.csproj --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test --project FbsDumper/FbsDumper.csproj --configuration Release --no-build --verbosity normal
+        run: dotnet test FbsDumper/FbsDumper.csproj --configuration Release --no-build --verbosity normal
 
       - name: Publish
-        run: dotnet publish --project FbsDumper/FbsDumper.csproj --configuration Release --runtime ${{ matrix.rid }} --output ./publish/${{ matrix.rid }}
+        run: dotnet publish FbsDumper/FbsDumper.csproj --configuration Release --runtime ${{ matrix.rid }} --output ./publish/${{ matrix.rid }}
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
