@@ -11,18 +11,24 @@ internal class TypeHelper
 
     public static List<TypeDefinition> GetAllFlatBufferTypes(ModuleDefinition module, string baseTypeName)
     {
-        List<TypeDefinition> ret = [.. module.GetTypes().Where(t =>
-                t.HasInterfaces &&
-                t.Interfaces.Any(i => i.InterfaceType.FullName == baseTypeName)
-            //  && t.FullName == "MX.Data.Excel.MinigameRoadPuzzleMapExcel"
-        )];
+        List<TypeDefinition> ret =
+        [
+            .. module.GetTypes().Where(t =>
+                    t.HasInterfaces &&
+                    t.Interfaces.Any(i => i.InterfaceType.FullName == baseTypeName)
+                //  && t.FullName == "MX.Data.Excel.MinigameRoadPuzzleMapExcel"
+            )
+        ];
 
         if (!string.IsNullOrEmpty(NameSpace2LookFor)) ret = ret.Where(t => t.Namespace == NameSpace2LookFor).ToList();
 
         // Dedupe
-        ret = [.. ret
-            .GroupBy(t => t.Name)
-            .Select(g => g.First())];
+        ret =
+        [
+            .. ret
+                .GroupBy(t => t.Name)
+                .Select(g => g.First())
+        ];
 
         // todo: check nested types
 
@@ -44,7 +50,7 @@ internal class TypeHelper
         if (createMethod == null)
         {
             Log.Warning($"{targetType.FullName} does NOT contain a Create{typeName} function. Fields will be empty");
-            
+
             ret.NoCreate = true;
             return ret;
         }
@@ -146,13 +152,52 @@ internal class TypeHelper
 
         foreach (var call in calls)
         {
-            var target = long.Parse(call.Target?[3..]!, NumberStyles.HexNumber);
+            if (string.IsNullOrEmpty(call.Target))
+            {
+                Log.Warning($"Empty call target found at address 0x{call.Address:X}");
+                continue;
+            }
+
+            long target;
+            if (call.Target.StartsWith("0x"))
+            {
+                var targetHex = call.Target[2..];
+                if (string.IsNullOrEmpty(targetHex) ||
+                    !long.TryParse(targetHex, NumberStyles.HexNumber, null, out target))
+                {
+                    Log.Warning($"Failed to parse hex value '{call.Target}' at address 0x{call.Address:X}");
+                    continue;
+                }
+            }
+            else if (call.Target.StartsWith('#'))
+            {
+                var targetDecimal = call.Target[1..];
+                if (string.IsNullOrEmpty(targetDecimal) ||
+                    !long.TryParse(targetDecimal, NumberStyles.Integer, null, out target))
+                {
+                    Log.Warning($"Failed to parse decimal value '{call.Target}' at address 0x{call.Address:X}");
+                    continue;
+                }
+            }
+            else
+            {
+                Log.Warning(
+                    $"Invalid call target format '{call.Target}' at address 0x{call.Address:X} - expected 0x or # prefix");
+                continue;
+            }
+
             switch (target)
             {
                 case var addr when addr == Parser.FlatBufferBuilder.StartObject:
                     hasStarted = true;
                     var arg1 = call.Args["w1"];
-                    var cnt = arg1.StartsWith('#') ? int.Parse(arg1[3..], NumberStyles.HexNumber) : 0;
+                    var cnt = 0;
+                    if (arg1.StartsWith('#'))
+                    {
+                        var argValue = arg1[1..];
+                        int.TryParse(argValue, NumberStyles.Integer, null, out cnt);
+                    }
+
                     max = cnt;
                     Log.Debug($"Has started, instance will have {cnt} fields");
                     break;
@@ -192,12 +237,40 @@ internal class TypeHelper
         var instructions = _instructionsResolver.GetInstructions(createMethod);
         var calls = InstructionsAnalyzer.AnalyzeCalls(instructions);
         var call = calls.First(m =>
-            Parser.FlatBufferBuilder.Methods.ContainsKey(long.Parse(m.Target?[3..]!, NumberStyles.HexNumber)));
+        {
+            if (string.IsNullOrEmpty(m.Target))
+                return false;
+
+            long target;
+            if (m.Target.StartsWith("0x"))
+            {
+                var targetHex = m.Target[2..];
+                if (!long.TryParse(targetHex, NumberStyles.HexNumber, null, out target))
+                    return false;
+            }
+            else if (m.Target.StartsWith('#'))
+            {
+                var targetDecimal = m.Target[1..];
+                if (!long.TryParse(targetDecimal, NumberStyles.Integer, null, out target))
+                    return false;
+            }
+            else
+            {
+                return false;
+            }
+
+            return Parser.FlatBufferBuilder.Methods.ContainsKey(target);
+        });
         var arg1 = call.Args["w1"];
-        var cnt = arg1.StartsWith('#') ? int.Parse(arg1[3..], NumberStyles.HexNumber) : 0;
+        var cnt = 0;
+        if (arg1.StartsWith('#'))
+        {
+            var argValue = arg1[1..];
+            int.TryParse(argValue, NumberStyles.Integer, null, out cnt);
+        }
 
         Log.Debug($"Index is {cnt}");
-        
+
         return cnt;
     }
 

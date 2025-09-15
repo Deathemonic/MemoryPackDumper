@@ -1,5 +1,5 @@
 ﻿using AsmArm64;
-using Mono.Cecil;   
+using Mono.Cecil;
 
 namespace FbsDumper;
 

@@ -3,7 +3,7 @@ namespace FbsDumper;
 public static class Args
 {
     /// <summary>
-    /// FlatBuffer Schema Dumper
+    ///     FlatBuffer Schema Dumper
     /// </summary>
     /// <param name="dummyDll">-d, Specifies the dummy DLL directory.</param>
     /// <param name="gameAssembly">-a, Specifies the path to libil2cpp.so.</param>
@@ -23,6 +23,7 @@ public static class Args
         bool verbose = false,
         bool suppressWarnings = false)
     {
-        Parser.Execute(dummyDll, gameAssembly, outputFile, @namespace, forceSnakeCase, namespaceToLookFor, verbose, suppressWarnings);
+        Parser.Execute(dummyDll, gameAssembly, outputFile, @namespace, forceSnakeCase, namespaceToLookFor, verbose,
+            suppressWarnings);
     }
 }

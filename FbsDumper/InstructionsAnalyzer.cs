@@ -1,6 +1,4 @@
-﻿using AsmArm64;
-
-namespace FbsDumper;
+﻿namespace FbsDumper;
 
 internal abstract class InstructionsAnalyzer
 {
@@ -35,10 +33,12 @@ internal abstract class InstructionsAnalyzer
                 case "bl":
                 case "b":
                 {
+                    var targetAddress = CalculateTarget(instr);
+
                     var call = new ArmCallInfo
                     {
                         Address = instr.Address,
-                        Target = ops.Length > 0 ? ops[0] : "<unknown>",
+                        Target = targetAddress.HasValue ? $"0x{targetAddress.Value:X}" : "<unknown>",
                         Args = []
                     };
 
@@ -69,6 +69,18 @@ internal abstract class InstructionsAnalyzer
         }
 
         return result;
+    }
+
+    private static ulong? CalculateTarget(InstructionWithAddress instr)
+    {
+        var operandString = instr.Operand;
+        if (string.IsNullOrEmpty(operandString)) return null;
+        var ops = operandString.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (ops.Length <= 0 || !ops[0].StartsWith('#')) return null;
+        var offsetStr = ops[0][1..];
+        if (long.TryParse(offsetStr, out var offset)) return instr.Address + (ulong)offset;
+
+        return null;
     }
 
     public class ArmCallInfo

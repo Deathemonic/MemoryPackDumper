@@ -9,6 +9,15 @@ public static class Log
     private static ILogger? _logger;
     private static bool _isInitialized;
 
+    public static ILogger Global
+    {
+        get
+        {
+            EnsureInitialized();
+            return _logger!;
+        }
+    }
+
     private static void EnsureInitialized()
     {
         if (_isInitialized) return;
@@ -22,8 +31,9 @@ public static class Log
             {
                 options.UsePlainTextFormatter(formatter =>
                 {
-                    formatter.SetPrefixFormatter($"{0:local-timeonly} [{1:short}] ", 
-                        (in MessageTemplate template, in LogInfo info) => template.Format(info.Timestamp, info.LogLevel));
+                    formatter.SetPrefixFormatter($"{0:local-timeonly} [{1:short}] ",
+                        (in MessageTemplate template, in LogInfo info) =>
+                            template.Format(info.Timestamp, info.LogLevel));
                 });
                 options.LogToStandardErrorThreshold = LogLevel.Error;
             });
@@ -54,7 +64,7 @@ public static class Log
     public static void Warning(string message)
     {
         if (Parser.SuppressWarnings) return;
-        
+
         EnsureInitialized();
         _logger!.ZLogWarning($"{message}");
     }
@@ -65,21 +75,9 @@ public static class Log
         _logger!.ZLogDebug($"{message}");
     }
 
-    public static ILogger Global
-    {
-        get
-        {
-            EnsureInitialized();
-            return _logger!;
-        }
-    }
-
     public static void EnableDebugLogging()
     {
-        if (_isInitialized)
-        {
-            Shutdown();
-        }
+        if (_isInitialized) Shutdown();
 
         _loggerFactory = LoggerFactory.Create(logging =>
         {
@@ -90,8 +88,9 @@ public static class Log
             {
                 options.UsePlainTextFormatter(formatter =>
                 {
-                    formatter.SetPrefixFormatter($"{0:local-timeonly} [{1:short}] ", 
-                        (in MessageTemplate template, in LogInfo info) => template.Format(info.Timestamp, info.LogLevel));
+                    formatter.SetPrefixFormatter($"{0:local-timeonly} [{1:short}] ",
+                        (in MessageTemplate template, in LogInfo info) =>
+                            template.Format(info.Timestamp, info.LogLevel));
                 });
                 options.LogToStandardErrorThreshold = LogLevel.Error;
             });
@@ -127,7 +126,7 @@ public static partial class LogMessages
 
     [ZLoggerMessage(LogLevel.Warning, "unknown system type {typeName}")]
     private static partial void LogUnknownSystemTypeInternal(this ILogger logger, string typeName);
-    
+
     public static void LogUnknownSystemType(this ILogger logger, string typeName)
     {
         if (!Parser.SuppressWarnings) logger.LogUnknownSystemTypeInternal(typeName);
@@ -138,10 +137,9 @@ public static partial class LogMessages
 
     [ZLoggerMessage(LogLevel.Warning, "Skipping call for 0x{address:X} because {reason}")]
     private static partial void LogSkippingCallInternal(this ILogger logger, ulong address, string reason);
-    
+
     public static void LogSkippingCall(this ILogger logger, ulong address, string reason)
     {
         if (!Parser.SuppressWarnings) logger.LogSkippingCallInternal(address, reason);
     }
 }
-

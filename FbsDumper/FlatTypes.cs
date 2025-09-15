@@ -12,8 +12,8 @@ public class FlatSchema
 public class FlatTable(string tableName)
 {
     public readonly List<FlatField> Fields = [];
-    public bool NoCreate = false;
     public readonly string TableName = tableName;
+    public bool NoCreate = false;
 }
 
 public class FlatField(TypeDefinition type, string name, bool isArray = false)

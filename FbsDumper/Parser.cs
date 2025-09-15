@@ -20,13 +20,10 @@ public static partial class Parser
     public static void Execute(string dummyDll, string gameAssembly, string outputFile, string nameSpace,
         bool forceSnakeCase, string? namespaceToLookFor, bool verbose, bool suppressWarnings)
     {
-        if (verbose)
-        {
-            Log.EnableDebugLogging();
-        }
-        
+        if (verbose) Log.EnableDebugLogging();
+
         SuppressWarnings = suppressWarnings;
-        
+
         _dummyAssemblyDir = dummyDll;
         GameAssemblyPath = gameAssembly;
         _outputFileName = outputFile;
@@ -212,10 +209,7 @@ public static partial class Parser
                 fieldType = "uint8";
                 break;
             default:
-                if (fieldType.StartsWith("System.")) 
-                {
-                    Log.Global.LogUnknownSystemType(fieldType);
-                }
+                if (fieldType.StartsWith("System.")) Log.Global.LogUnknownSystemType(fieldType);
                 break;
         }
 
