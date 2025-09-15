@@ -1,6 +1,5 @@
-﻿using Gee.External.Capstone;
-using Gee.External.Capstone.Arm64;
-using Mono.Cecil;
+﻿using AsmArm64;
+using Mono.Cecil;   
 
 namespace FbsDumper;
 
@@ -8,23 +7,20 @@ internal class InstructionsParser(string gameAssemblyPath)
 {
     private readonly byte[] _fileBytes = File.ReadAllBytes(gameAssemblyPath);
 
-    public List<Arm64Instruction> GetInstructions(MethodDefinition targetMethod, bool debug = false)
+    public List<InstructionWithAddress> GetInstructions(MethodDefinition targetMethod, bool debug = false)
     {
         var rva = GetMethodRva(targetMethod);
         if (rva != 0) return GetInstructions(rva, debug);
-        
+
         Log.Warning($"Invalid RVA or offset for method: {targetMethod.FullName}");
-        
+
         return [];
     }
 
-    private List<Arm64Instruction> GetInstructions(long rva, bool debug = false)
+    private List<InstructionWithAddress> GetInstructions(long rva, bool debug = false)
     {
-        var instructions = new List<Arm64Instruction>();
+        var instructions = new List<InstructionWithAddress>();
 
-        using var capstone = CapstoneDisassembler.CreateArm64Disassembler(Arm64DisassembleMode.LittleEndian);
-        capstone.EnableInstructionDetails = false;
-        
         const int instrSize = 4;
         var currentOffset = rva;
 
@@ -33,25 +29,41 @@ internal class InstructionsParser(string gameAssemblyPath)
             var instrBytes = new byte[instrSize];
             Array.Copy(_fileBytes, currentOffset, instrBytes, 0, instrSize);
 
-            var decoded = capstone.Disassemble(instrBytes, currentOffset);
-            if (decoded.Length == 0)
-                break;
+            var instrValue = BitConverter.ToUInt32(instrBytes, 0);
 
-            var instr = decoded[0];
-            instructions.Add(instr);
-
-            if (debug)
+            try
             {
-                Log.Global.LogInstruction((ulong)instr.Address, instr.Mnemonic, instr.Operand);
+                var instr = Arm64Instruction.Decode(instrValue);
+                var instrWithAddress = new InstructionWithAddress(instr, (ulong)currentOffset);
+                instructions.Add(instrWithAddress);
+
+                if (debug)
+                {
+                    var operandString = GetOperandString(instr);
+                    Log.Global.LogInstruction((ulong)currentOffset, instr.Mnemonic.ToString().ToLower(), operandString);
+                }
+
+                currentOffset += instrSize;
+
+                if (instr.Mnemonic.ToString().Equals("ret", StringComparison.CurrentCultureIgnoreCase))
+                    break;
             }
-
-            currentOffset += instrSize;
-
-            if (instr.Mnemonic == "ret")
+            catch
+            {
                 break;
+            }
         }
 
         return instructions;
+    }
+
+    private static string GetOperandString(Arm64Instruction instruction)
+    {
+        if (instruction.Operands.Count == 0)
+            return string.Empty;
+
+        var operands = instruction.Operands.Select(operand => operand.ToString()).ToList();
+        return string.Join(", ", operands);
     }
 
 
@@ -67,5 +79,22 @@ internal class InstructionsParser(string gameAssemblyPath)
         var argRva = customAttr.Fields.First(f => f.Name == "RVA");
         var rva = Convert.ToInt64(argRva.Argument.Value.ToString()?[2..], 16);
         return rva;
+    }
+}
+
+internal record InstructionWithAddress(Arm64Instruction Instruction, ulong Address)
+{
+    public string Mnemonic => Instruction.Mnemonic.ToString().ToLower();
+
+    public string? Operand
+    {
+        get
+        {
+            if (Instruction.Operands.Count == 0)
+                return null;
+
+            var operands = Instruction.Operands.Select(operand => operand.ToString()).ToList();
+            return string.Join(", ", operands);
+        }
     }
 }

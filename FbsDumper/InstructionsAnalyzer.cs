@@ -1,10 +1,10 @@
-﻿using Gee.External.Capstone.Arm64;
+﻿using AsmArm64;
 
 namespace FbsDumper;
 
 internal abstract class InstructionsAnalyzer
 {
-    public static List<ArmCallInfo> AnalyzeCalls(List<Arm64Instruction> instructions)
+    public static List<ArmCallInfo> AnalyzeCalls(List<InstructionWithAddress> instructions)
     {
         var result = new List<ArmCallInfo>();
         var regState = new Dictionary<string, string>();
@@ -12,9 +12,10 @@ internal abstract class InstructionsAnalyzer
         foreach (var instr in instructions)
         {
             var mnemonic = instr.Mnemonic;
-            var ops =
-                instr.Operand?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ??
-                [];
+            var operandString = instr.Operand;
+            var ops = string.IsNullOrEmpty(operandString)
+                ? []
+                : operandString.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
             switch (mnemonic)
             {
@@ -36,7 +37,7 @@ internal abstract class InstructionsAnalyzer
                 {
                     var call = new ArmCallInfo
                     {
-                        Address = (ulong)instr.Address,
+                        Address = instr.Address,
                         Target = ops.Length > 0 ? ops[0] : "<unknown>",
                         Args = []
                     };
@@ -59,7 +60,7 @@ internal abstract class InstructionsAnalyzer
                 {
                     if (mnemonic == "cbz" || mnemonic == "cmp" || mnemonic.StartsWith('b'))
                     {
-                        // not handle for now
+                        // Not Implemented
                     }
 
                     break;
