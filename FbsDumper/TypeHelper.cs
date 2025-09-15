@@ -142,7 +142,8 @@ internal class TypeHelper
         }
 
         var instructions = _instructionsResolver.GetInstructions(createMethod);
-        var calls = InstructionsAnalyzer.AnalyzeCalls(instructions);
+        var analyzer = InstructionsAnalyzer.GetAnalyzer(_instructionsResolver.Architecture);
+        var calls = analyzer.AnalyzeCalls(instructions);
         var hasStarted = false;
         var max = 0;
         var cur = 0;
@@ -190,12 +191,24 @@ internal class TypeHelper
             {
                 case var addr when addr == Parser.FlatBufferBuilder.StartObject:
                     hasStarted = true;
-                    var arg1 = call.Args["w1"];
                     var cnt = 0;
-                    if (arg1.StartsWith('#'))
+                    
+                    if (call.Args.TryGetValue("w1", out var arg1) && arg1.StartsWith('#'))
                     {
                         var argValue = arg1[1..];
                         int.TryParse(argValue, NumberStyles.Integer, null, out cnt);
+                    }
+                    else if (call.EdxValue != null)
+                    {
+                        var edxValue = call.EdxValue;
+                        if (edxValue.StartsWith("0x"))
+                        {
+                            int.TryParse(edxValue[2..], NumberStyles.HexNumber, null, out cnt);
+                        }
+                        else
+                        {
+                            int.TryParse(edxValue, NumberStyles.Integer, null, out cnt);
+                        }
                     }
 
                     max = cnt;
@@ -235,7 +248,8 @@ internal class TypeHelper
     private int ParseCalls4AddMethod(MethodDefinition createMethod)
     {
         var instructions = _instructionsResolver.GetInstructions(createMethod);
-        var calls = InstructionsAnalyzer.AnalyzeCalls(instructions);
+        var analyzer = InstructionsAnalyzer.GetAnalyzer(_instructionsResolver.Architecture);
+        var calls = analyzer.AnalyzeCalls(instructions);
         var call = calls.First(m =>
         {
             if (string.IsNullOrEmpty(m.Target))
@@ -261,12 +275,24 @@ internal class TypeHelper
 
             return Parser.FlatBufferBuilder.Methods.ContainsKey(target);
         });
-        var arg1 = call.Args["w1"];
         var cnt = 0;
-        if (arg1.StartsWith('#'))
+        
+        if (call.Args.TryGetValue("w1", out var arg1) && arg1.StartsWith('#'))
         {
             var argValue = arg1[1..];
             int.TryParse(argValue, NumberStyles.Integer, null, out cnt);
+        }
+        else if (call.EdxValue != null)
+        {
+            var edxValue = call.EdxValue;
+            if (edxValue.StartsWith("0x"))
+            {
+                int.TryParse(edxValue[2..], NumberStyles.HexNumber, null, out cnt);
+            }
+            else
+            {
+                int.TryParse(edxValue, NumberStyles.Integer, null, out cnt);
+            }
         }
 
         Log.Debug($"Index is {cnt}");

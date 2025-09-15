@@ -6,7 +6,7 @@ public static class Args
     ///     FlatBuffer Schema Dumper
     /// </summary>
     /// <param name="dummyDll">-d, Specifies the dummy DLL directory.</param>
-    /// <param name="gameAssembly">-a, Specifies the path to libil2cpp.so.</param>
+    /// <param name="gameAssembly">-a, Specifies the path to libil2cpp.so (ARM) or GameAssembly.dll (x86/x64).</param>
     /// <param name="outputFile">-o, Specifies the output file.</param>
     /// <param name="namespace">-n, Specifies the flatdata namespace</param>
     /// <param name="forceSnakeCase">-s, Force snake case.</param>
