@@ -1,8 +1,9 @@
-﻿using AsmArm64;
+using AsmArm64;
+using FbsDumper.Helpers;
 using Iced.Intel;
 using Mono.Cecil;
 
-namespace FbsDumper;
+namespace FbsDumper.Instructions;
 
 internal class InstructionsParser
 {
@@ -245,4 +246,10 @@ internal record InstructionWithAddress(Arm64Instruction? Instruction, ulong Addr
             return string.Join(", ", operands);
         }
     }
+}
+
+public enum Architecture
+{
+    Arm64,
+    X86
 }

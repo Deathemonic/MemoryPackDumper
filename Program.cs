@@ -1,4 +1,4 @@
 using ConsoleAppFramework;
-using FbsDumper;
+using FbsDumper.CLI;
 
 ConsoleApp.Run(args, Args.Run);

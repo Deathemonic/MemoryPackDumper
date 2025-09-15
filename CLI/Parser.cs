@@ -1,8 +1,11 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using FbsDumper.Assembly;
+using FbsDumper.Helpers;
+using FbsDumper.Instructions;
 using Mono.Cecil;
 
-namespace FbsDumper;
+namespace FbsDumper.CLI;
 
 public static partial class Parser
 {

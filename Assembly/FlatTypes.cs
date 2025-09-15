@@ -1,7 +1,7 @@
-﻿using Mono.Cecil;
+using Mono.Cecil;
 using Newtonsoft.Json;
 
-namespace FbsDumper;
+namespace FbsDumper.Assembly;
 
 public class FlatSchema
 {

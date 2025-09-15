@@ -1,4 +1,4 @@
-namespace FbsDumper;
+namespace FbsDumper.CLI;
 
 public static class Args
 {

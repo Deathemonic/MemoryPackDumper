@@ -1,7 +1,8 @@
+using FbsDumper.CLI;
 using Microsoft.Extensions.Logging;
 using ZLogger;
 
-namespace FbsDumper;
+namespace FbsDumper.Helpers;
 
 public static class Log
 {

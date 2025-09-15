@@ -1,13 +1,15 @@
-﻿using System.Globalization;
+using System.Globalization;
+using FbsDumper.CLI;
+using FbsDumper.Helpers;
+using FbsDumper.Instructions;
 using Mono.Cecil;
 using Mono.Cecil.Rocks;
-using static FbsDumper.Parser;
 
-namespace FbsDumper;
+namespace FbsDumper.Assembly;
 
 internal class TypeHelper
 {
-    private readonly InstructionsParser _instructionsResolver = new(GameAssemblyPath);
+    private readonly InstructionsParser _instructionsResolver = new(Parser.GameAssemblyPath);
 
     public static List<TypeDefinition> GetAllFlatBufferTypes(ModuleDefinition module, string baseTypeName)
     {
@@ -20,7 +22,8 @@ internal class TypeHelper
             )
         ];
 
-        if (!string.IsNullOrEmpty(NameSpace2LookFor)) ret = ret.Where(t => t.Namespace == NameSpace2LookFor).ToList();
+        if (!string.IsNullOrEmpty(Parser.NameSpace2LookFor))
+            ret = ret.Where(t => t.Namespace == Parser.NameSpace2LookFor).ToList();
 
         // Dedupe
         ret =
@@ -123,7 +126,7 @@ internal class TypeHelper
                 field.Type = fieldType;
             }
 
-            if (field.Type.IsEnum && !FlatEnumsToAdd.Contains(fieldType)) FlatEnumsToAdd.Add(fieldType);
+            if (field.Type.IsEnum && !Parser.FlatEnumsToAdd.Contains(fieldType)) Parser.FlatEnumsToAdd.Add(fieldType);
 
             ret.Fields.Add(field);
         }
@@ -192,7 +195,7 @@ internal class TypeHelper
                 case var addr when addr == Parser.FlatBufferBuilder.StartObject:
                     hasStarted = true;
                     var cnt = 0;
-                    
+
                     if (call.Args.TryGetValue("w1", out var arg1) && arg1.StartsWith('#'))
                     {
                         var argValue = arg1[1..];
@@ -202,13 +205,9 @@ internal class TypeHelper
                     {
                         var edxValue = call.EdxValue;
                         if (edxValue.StartsWith("0x"))
-                        {
                             int.TryParse(edxValue[2..], NumberStyles.HexNumber, null, out cnt);
-                        }
                         else
-                        {
                             int.TryParse(edxValue, NumberStyles.Integer, null, out cnt);
-                        }
                     }
 
                     max = cnt;
@@ -276,7 +275,7 @@ internal class TypeHelper
             return Parser.FlatBufferBuilder.Methods.ContainsKey(target);
         });
         var cnt = 0;
-        
+
         if (call.Args.TryGetValue("w1", out var arg1) && arg1.StartsWith('#'))
         {
             var argValue = arg1[1..];
@@ -286,13 +285,9 @@ internal class TypeHelper
         {
             var edxValue = call.EdxValue;
             if (edxValue.StartsWith("0x"))
-            {
                 int.TryParse(edxValue[2..], NumberStyles.HexNumber, null, out cnt);
-            }
             else
-            {
                 int.TryParse(edxValue, NumberStyles.Integer, null, out cnt);
-            }
         }
 
         Log.Debug($"Index is {cnt}");
