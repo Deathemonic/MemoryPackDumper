@@ -10,27 +10,31 @@ public static partial class Parser
     public static string GameAssemblyPath = "libil2cpp.so";
     private static string _outputFileName = "BlueArchive.fbs";
     private static string? _customNameSpace = "FlatData";
+    public static FlatDataDumperVersion DumperVersion = FlatDataDumperVersion.V2;
     private static bool _forceSnakeCase;
+    public static bool ForceDump = true;
     public static string? NameSpace2LookFor;
     private static readonly string FlatBaseType = "FlatBuffers.IFlatbufferObject";
     public static FlatBufferBuilder FlatBufferBuilder = null!;
     public static readonly List<TypeDefinition> FlatEnumsToAdd = [];
     public static bool SuppressWarnings;
 
-    public static void Execute(string dummyDll, string gameAssembly, string outputFile, string nameSpace,
-        bool forceSnakeCase, string? namespaceToLookFor, bool verbose, bool suppressWarnings)
+    public static void Execute(
+        string dummyDll, string gameAssembly, string outputFile, string nameSpace,
+        FlatDataDumperVersion dumperVersion, bool forceDump, bool forceSnakeCase, string? namespaceToLookFor,
+        bool verbose, bool suppressWarnings)
     {
         if (verbose)
-        {
             Log.EnableDebugLogging();
-        }
-        
+
         SuppressWarnings = suppressWarnings;
-        
+
         _dummyAssemblyDir = dummyDll;
         GameAssemblyPath = gameAssembly;
         _outputFileName = outputFile;
         _customNameSpace = nameSpace;
+        DumperVersion = dumperVersion;
+        ForceDump = forceDump;
         NameSpace2LookFor = namespaceToLookFor;
         _forceSnakeCase = forceSnakeCase;
 
@@ -75,6 +79,8 @@ public static partial class Parser
             Log.Shutdown();
             Environment.Exit(1);
         }
+
+        Log.Info($"Using FlatData Dumper {DumperVersion} ...");
 
         var asmFbs = AssemblyDefinition.ReadAssembly(flatBuffersDllPath, readerParameters);
 
@@ -212,7 +218,7 @@ public static partial class Parser
                 fieldType = "uint8";
                 break;
             default:
-                if (fieldType.StartsWith("System.")) 
+                if (fieldType.StartsWith("System."))
                 {
                     Log.Global.LogUnknownSystemType(fieldType);
                 }
@@ -224,33 +230,4 @@ public static partial class Parser
 
     [GeneratedRegex(@"(([a-z])(?=[A-Z][a-zA-Z])|([A-Z])(?=[A-Z][a-z]))")]
     private static partial Regex MyRegex();
-}
-
-public class FlatBufferBuilder
-{
-    public readonly long EndObject;
-    public readonly Dictionary<long, MethodDefinition> Methods;
-    public readonly long StartObject;
-
-    public FlatBufferBuilder(ModuleDefinition flatBuffersDllModule)
-    {
-        Methods = [];
-        var flatBufferBuilderType = flatBuffersDllModule.GetType("FlatBuffers.FlatBufferBuilder");
-        foreach (var method in flatBufferBuilderType.Methods)
-        {
-            var rva = InstructionsParser.GetMethodRva(method);
-            {
-                switch (method.Name)
-                {
-                    case "StartObject":
-                        StartObject = rva;
-                        break;
-                    case "EndObject":
-                        EndObject = rva;
-                        break;
-                }
-            }
-            Methods.Add(rva, method);
-        }
-    }
 }

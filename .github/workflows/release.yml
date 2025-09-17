@@ -1,17 +1,25 @@
-name: Build
+name: Release
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
+    inputs:
+      release-name:
+        description: 'The name for the new release'
+        required: true
+        default: 'Development Build'
+      release-tag:
+        description: 'The tag for the new release (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
 
 jobs:
   build:
     name: Build for ${{ matrix.os }} (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
-    
+
+    permissions:
+      contents: write
+
     strategy:
       matrix:
         include:
@@ -60,9 +68,16 @@ jobs:
 
       - name: Publish
         run: dotnet publish FbsDumper/FbsDumper.csproj --configuration Release --runtime ${{ matrix.rid }} --output ./publish/${{ matrix.rid }}
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+      
+      - name: Create Zip Archive
+        uses: vimtor/action-zip@v1.2
         with:
-          name: ${{ github.event.repository.name }}-${{ matrix.rid }}
-          path: publish/${{ matrix.rid }}
+          files: ./publish/${{ matrix.rid }}
+          dest: ${{ github.event.repository.name }}-${{ github.event.inputs.release-tag }}-${{ matrix.rid }}.zip
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.event.inputs.release-name }}
+          tag_name: ${{ github.event.inputs.release-tag }}
+          files: ${{ github.event.repository.name }}-${{ github.event.inputs.release-tag }}-${{ matrix.rid }}.zip

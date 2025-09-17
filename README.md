@@ -3,6 +3,8 @@ A tool to recover FlatBuffer schema definitions from game assemblies using assem
 
 Originally made for **Blue Archive**, should theoretically work with other games but is untested.
 
+FBS Dumper V1 dumped from DummyDll, while V2 utilizes both DummyDll and libil2cpp.
+
 ## Usage
 ```bash
 # Build the project
@@ -20,6 +22,8 @@ FbsDumper.exe --help
 - `-a, --game-assembly`: Specifies the path to libil2cpp.so (Required)  
 - `-o, --output-file`: Specifies the output file (Default: BlueArchive.fbs)
 - `-n, --namespace`: Specifies the flatdata namespace (Default: FlatData)
+- `-dv, --dump-version`: Specifies the dump version (Default: V2)
+- `-f, --force`: Force dump for V1 dumper. (Default: true)
 - `-s, --force-snake-case`: Force snake case conversion
 - `-nl, --namespace-to-look-for`: Specifies the namespace to look for
 - `-v, --verbose`: Enable verbose debug logging

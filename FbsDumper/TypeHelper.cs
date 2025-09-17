@@ -17,7 +17,8 @@ internal class TypeHelper
             //  && t.FullName == "MX.Data.Excel.MinigameRoadPuzzleMapExcel"
         )];
 
-        if (!string.IsNullOrEmpty(NameSpace2LookFor)) ret = ret.Where(t => t.Namespace == NameSpace2LookFor).ToList();
+        if (!string.IsNullOrEmpty(NameSpace2LookFor))
+            ret = ret.Where(t => t.Namespace == NameSpace2LookFor).ToList();
 
         // Dedupe
         ret = [.. ret
@@ -41,20 +42,173 @@ internal class TypeHelper
             m is { IsStatic: true, IsPublic: true }
         );
 
-        if (createMethod == null)
+        if (DumperVersion == FlatDataDumperVersion.V1)
         {
-            Log.Warning($"{targetType.FullName} does NOT contain a Create{typeName} function. Fields will be empty");
-            
-            ret.NoCreate = true;
-            return ret;
+            if (createMethod == null)
+            {
+                if (ForceDump == true)
+                {
+                    ForceProcessFields(ref ret, targetType);
+                    return ret;
+                    // return null;
+                }
+                Console.WriteLine($"[ERR] {targetType.FullName} does NOT contain a Create{typeName} function, skipping...");
+                return null;
+            }
+            ProcessFieldsV1(ref ret, createMethod, targetType);
         }
+        else
+        {
+            if (createMethod == null)
+            {
+                Log.Warning($"{targetType.FullName} does NOT contain a Create{typeName} function. Fields will be empty");
 
-        ProcessFields(ref ret, createMethod, targetType);
+                ret.NoCreate = true;
+                return ret;
+            }
+            ProcessFieldsV2(ref ret, createMethod, targetType);
+        }
 
         return ret;
     }
 
-    private void ProcessFields(ref FlatTable ret, MethodDefinition createMethod, TypeDefinition targetType)
+    private static void ProcessFieldsV1(ref FlatTable ret, MethodDefinition createMethod, TypeDefinition targetType)
+    {
+        foreach (ParameterDefinition param in createMethod.Parameters.Skip(1))
+        {
+            TypeDefinition fieldType = param.ParameterType.Resolve();
+            TypeReference fieldTypeRef = param.ParameterType;
+            string fieldName = param.Name;
+
+            if (fieldTypeRef is GenericInstanceType genericInstance)
+            {
+                // GenericInstanceType genericInstance = (GenericInstanceType)fieldTypeRef;
+                fieldType = genericInstance.GenericArguments.First().Resolve();
+                fieldTypeRef = genericInstance.GenericArguments.First();
+            }
+
+            FlatField field = new FlatField(fieldType, fieldName.Replace("_", "")); // needed for BA
+
+            switch (fieldType.FullName)
+            {
+                case "FlatBuffers.StringOffset":
+                    field.Type = targetType.Module.TypeSystem.String.Resolve();
+                    field.Name = fieldName.EndsWith("Offset") ?
+                                    new string(fieldName.SkipLast("Offset".Length).ToArray()) :
+                                    fieldName;
+                    field.Name = field.Name.Replace("_", ""); // needed for BA
+                    break;
+                case "FlatBuffers.VectorOffset":
+                case "FlatBuffers.Offset":
+                    string newFieldName = fieldName.EndsWith("Offset") ?
+                                    new string(fieldName.SkipLast("Offset".Length).ToArray()) :
+                                    fieldName;
+                    newFieldName = newFieldName.Replace("_", ""); // needed for BA
+
+                    MethodDefinition method = targetType.Methods.First(m =>
+                        m.Name.ToLower() == newFieldName.ToLower()
+                    );
+                    TypeDefinition typeDefinition = method.ReturnType.Resolve();
+                    field.IsArray = fieldType.FullName == "FlatBuffers.VectorOffset";
+                    fieldType = typeDefinition;
+                    fieldTypeRef = method.ReturnType;
+
+                    field.Type = typeDefinition;
+                    field.Name = method.Name;
+                    break;
+                default:
+                    break;
+
+            }
+
+            if (fieldTypeRef.IsGenericInstance)
+            {
+                GenericInstanceType newGenericInstance = (GenericInstanceType)fieldTypeRef;
+                fieldType = newGenericInstance.GenericArguments.First().Resolve();
+                fieldTypeRef = newGenericInstance.GenericArguments.First();
+                field.Type = fieldType;
+            }
+
+            if (field.Type.IsEnum && !FlatEnumsToAdd.Contains(fieldType))
+                FlatEnumsToAdd.Add(fieldType);
+
+            ret.Fields.Add(field);
+        }
+    }
+
+    private static void ForceProcessFields(ref FlatTable ret, TypeDefinition targetType)
+    {
+        foreach (MethodDefinition method in targetType.GetMethods().Where(m =>
+            m.IsPublic &&
+            m.IsStatic &&
+            m.Name.StartsWith("Add") &&
+            m.HasParameters &&
+            m.Parameters.Count == 2 &&
+            m.Parameters.First().Name == "builder"
+        ))
+        {
+            // Console.WriteLine(method.Name);
+
+            ParameterDefinition param = method.Parameters[1];
+
+            TypeDefinition fieldType = param.ParameterType.Resolve();
+            TypeReference fieldTypeRef = param.ParameterType;
+            string fieldName = param.Name;
+
+            if (fieldTypeRef is GenericInstanceType genericInstance)
+            {
+                // GenericInstanceType genericInstance = (GenericInstanceType)fieldTypeRef;
+                fieldType = genericInstance.GenericArguments.First().Resolve();
+                fieldTypeRef = genericInstance.GenericArguments.First();
+            }
+
+            FlatField field = new FlatField(fieldType, fieldName);
+
+            switch (fieldType.FullName)
+            {
+                case "FlatBuffers.StringOffset":
+                    field.Type = targetType.Module.TypeSystem.String.Resolve();
+                    field.Name = fieldName.EndsWith("Offset") ?
+                                    new string(fieldName.SkipLast("Offset".Length).ToArray()) :
+                                    fieldName;
+                    break;
+                case "FlatBuffers.VectorOffset":
+                case "FlatBuffers.Offset":
+                    string newFieldName = fieldName.EndsWith("Offset") ?
+                                    new string(fieldName.SkipLast("Offset".Length).ToArray()) :
+                                    fieldName;
+                    newFieldName = newFieldName.Replace("_", ""); // needed for BA
+
+                    if (fieldType.FullName == "FlatBuffers.VectorOffset")
+                    {
+                        MethodDefinition startMethod = targetType.Methods.First(m => m.Name == $"Start{newFieldName}Vector");
+                        fieldType = startMethod.Parameters[1].ParameterType.Resolve();
+                        field.IsArray = true;
+                    }
+
+                    fieldTypeRef = fieldType;
+                    field.Type = fieldType;
+                    field.Name = method.Name;
+
+                    break;
+                default:
+                    break;
+
+            }
+
+            if (fieldTypeRef.IsGenericInstance)
+            {
+                GenericInstanceType newGenericInstance = (GenericInstanceType)fieldTypeRef;
+                fieldType = newGenericInstance.GenericArguments.First().Resolve();
+                fieldTypeRef = newGenericInstance.GenericArguments.First();
+                field.Type = fieldType;
+            }
+
+            ret.Fields.Add(field);
+        }
+    }
+
+    private void ProcessFieldsV2(ref FlatTable ret, MethodDefinition createMethod, TypeDefinition targetType)
     {
         var dict = ParseCalls4CreateMethod(createMethod, targetType);
         dict = dict.OrderBy(t => t.Key).ToDictionary();
@@ -117,7 +271,8 @@ internal class TypeHelper
                 field.Type = fieldType;
             }
 
-            if (field.Type.IsEnum && !FlatEnumsToAdd.Contains(fieldType)) FlatEnumsToAdd.Add(fieldType);
+            if (field.Type.IsEnum && !FlatEnumsToAdd.Contains(fieldType))
+                FlatEnumsToAdd.Add(fieldType);
 
             ret.Fields.Add(field);
         }
@@ -197,7 +352,7 @@ internal class TypeHelper
         var cnt = arg1.StartsWith('#') ? int.Parse(arg1[3..], NumberStyles.HexNumber) : 0;
 
         Log.Debug($"Index is {cnt}");
-        
+
         return cnt;
     }
 
@@ -214,4 +369,10 @@ internal class TypeHelper
 
         return ret;
     }
+}
+
+public enum FlatDataDumperVersion
+{
+    V1,
+    V2
 }
