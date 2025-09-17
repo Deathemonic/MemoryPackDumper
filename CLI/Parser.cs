@@ -79,22 +79,27 @@ public static partial class Parser
         var asmFbs = AssemblyDefinition.ReadAssembly(flatBuffersDllPath, readerParameters);
 
         FlatBufferBuilder = new FlatBufferBuilder(asmFbs.MainModule);
-        var typeHelper = new TypeHelper();
+
+        var architecture = TypeHelper.DetectArchitecture(GameAssemblyPath);
+        var typeParser = TypeHelper.GetTypeParser(architecture);
+
+        Log.Info($"Detected architecture: {architecture}");
         Log.Info("Getting a list of types...");
+
         var typeDefs = TypeHelper.GetAllFlatBufferTypes(asm.MainModule, FlatBaseType);
         var schema = new FlatSchema();
         var done = 0;
         foreach (var typeDef in typeDefs)
         {
             Log.Global.LogProgress(done + 1, typeDefs.Count);
-            var table = typeHelper.Type2Table(typeDef);
+            var table = TypeHelper.TypeToTable(typeParser, typeDef);
 
             schema.FlatTables.Add(table);
             done += 1;
         }
 
         Log.Info("Adding enums...");
-        foreach (var fEnum in FlatEnumsToAdd.Select(TypeHelper.Type2Enum)) schema.FlatEnums.Add(fEnum);
+        foreach (var fEnum in FlatEnumsToAdd.Select(TypeHelper.TypeToEnum)) schema.FlatEnums.Add(fEnum);
 
         Log.Info($"Writing schema to {_outputFileName}...");
         File.WriteAllText(_outputFileName, SchemaToString(schema));

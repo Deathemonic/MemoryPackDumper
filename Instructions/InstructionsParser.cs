@@ -20,14 +20,14 @@ internal class InstructionsParser
     private readonly ByteArrayCodeReader? _codeReader;
     private readonly byte[] _fileBytes;
 
+    public Architecture Architecture { get; }
+
     public InstructionsParser(string gameAssemblyPath)
     {
         _fileBytes = File.ReadAllBytes(gameAssemblyPath);
         Architecture = DetectArchitecture(gameAssemblyPath);
         _codeReader = Architecture == Architecture.X86 ? new ByteArrayCodeReader(_fileBytes) : null;
     }
-
-    public Architecture Architecture { get; }
 
     private static Architecture DetectArchitecture(string gameAssemblyPath)
     {

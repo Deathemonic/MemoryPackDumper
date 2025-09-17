@@ -20,6 +20,7 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Iced" Version="1.21.0" />
+    <PackageReference Include="Kokuban" Version="0.2.0" />
     <PackageReference Include="Mono.Cecil" Version="0.11.6" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="ZLogger" Version="2.5.10" />

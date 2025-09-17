@@ -1,6 +1,6 @@
 namespace FbsDumper.Instructions.Analyzers;
 
-internal class ArmInstructionAnalyzer : IInstructionAnalyzer
+internal class ArmAnalyzer : IInstructionAnalyzer
 {
     public List<InstructionsAnalyzer.CallInfo> AnalyzeCalls(List<InstructionWithAddress> instructions)
     {

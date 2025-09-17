@@ -8,8 +8,8 @@ internal abstract class InstructionsAnalyzer
     {
         return architecture switch
         {
-            Architecture.Arm64 => new ArmInstructionAnalyzer(),
-            Architecture.X86 => new X86InstructionAnalyzer(),
+            Architecture.Arm64 => new ArmAnalyzer(),
+            Architecture.X86 => new X86Analyzer(),
             _ => throw new ArgumentException($"Unsupported architecture: {architecture}")
         };
     }
@@ -18,8 +18,10 @@ internal abstract class InstructionsAnalyzer
     {
         public ulong Address;
         public Dictionary<string, string> Args = [];
-        public string? EdxValue;
         public string? Target;
+		public string? ArgSource;
+        public int? ArgIndex;
+        public string? EdxValue;
     }
 }
 

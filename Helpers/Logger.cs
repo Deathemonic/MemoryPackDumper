@@ -1,4 +1,5 @@
 using FbsDumper.CLI;
+using Kokuban;
 using Microsoft.Extensions.Logging;
 using ZLogger;
 
@@ -32,9 +33,13 @@ public static class Log
             {
                 options.UsePlainTextFormatter(formatter =>
                 {
-                    formatter.SetPrefixFormatter($"{0:local-timeonly} [{1:short}] ",
+                    formatter.SetPrefixFormatter($"{0} {1} ",
                         (in MessageTemplate template, in LogInfo info) =>
-                            template.Format(info.Timestamp, info.LogLevel));
+                        {
+                            var timestamp = Chalk.Gray + info.Timestamp.Local.ToString("HH:mm:ss");
+                            var logLevel = GetColoredLogLevel(info.LogLevel);
+                            template.Format(timestamp, logLevel);
+                        });
                 });
                 options.LogToStandardErrorThreshold = LogLevel.Error;
             });
@@ -42,6 +47,20 @@ public static class Log
 
         _logger = _loggerFactory.CreateLogger("FbsDumper");
         _isInitialized = true;
+    }
+
+    private static string GetColoredLogLevel(LogLevel logLevel)
+    {
+        return logLevel switch
+        {
+            LogLevel.Trace => Chalk.Magenta + "[TRC]",
+            LogLevel.Debug => Chalk.Cyan + "[DBG]",
+            LogLevel.Information => Chalk.Blue + "[INF]",
+            LogLevel.Warning => Chalk.Yellow + "[WRN]",
+            LogLevel.Error => Chalk.Red + "[ERR]",
+            LogLevel.Critical => Chalk.BgRed.White + "[CRT]",
+            _ => Chalk.White + "[???]"
+        };
     }
 
     public static void Info(string message)
@@ -89,9 +108,13 @@ public static class Log
             {
                 options.UsePlainTextFormatter(formatter =>
                 {
-                    formatter.SetPrefixFormatter($"{0:local-timeonly} [{1:short}] ",
+                    formatter.SetPrefixFormatter($"{0} {1} ",
                         (in MessageTemplate template, in LogInfo info) =>
-                            template.Format(info.Timestamp, info.LogLevel));
+                        {
+                            var timestamp = Chalk.Gray + info.Timestamp.Local.ToString("HH:mm:ss");
+                            var logLevel = GetColoredLogLevel(info.LogLevel);
+                            template.Format(timestamp, logLevel);
+                        });
                 });
                 options.LogToStandardErrorThreshold = LogLevel.Error;
             });
