@@ -19,6 +19,10 @@ jobs:
             arch: x86_64
             runner: windows-latest
             rid: win-x64
+          - os: windows
+            arch: aarch64
+            runner: windows-latest
+            rid: win-arm64
           - os: macos
             arch: x86_64
             runner: macos-15

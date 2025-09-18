@@ -1,11 +1,8 @@
 using System.Text;
 using System.Text.RegularExpressions;
-using FbsDumper.Assembly;
-using FbsDumper.Helpers;
-using FbsDumper.Instructions;
 using Mono.Cecil;
 
-namespace FbsDumper.CLI;
+namespace FbsDumper;
 
 public static partial class Parser
 {
@@ -13,19 +10,22 @@ public static partial class Parser
     public static string GameAssemblyPath = "libil2cpp.so";
     private static string _outputFileName = "BlueArchive.fbs";
     private static string? _customNameSpace = "FlatData";
+    public static FlatDataDumperVersion DumperVersion = FlatDataDumperVersion.V2;
     private static bool _forceSnakeCase;
+    public static bool ForceDump = true;
     public static string? NameSpace2LookFor;
     private static readonly string FlatBaseType = "FlatBuffers.IFlatbufferObject";
-    public static FlatBuilder FlatBufferBuilder = null!;
+    public static FlatBufferBuilder FlatBufferBuilder = null!;
     public static readonly List<TypeDefinition> FlatEnumsToAdd = [];
     public static bool SuppressWarnings;
-    public static bool NoAsmProcessing;
-    public static bool Force;
 
-    public static void Execute(string dummyDll, string gameAssembly, string outputFile, string nameSpace,
-        bool forceSnakeCase, string? namespaceToLookFor, bool force, bool verbose, bool suppressWarnings)
+    public static void Execute(
+        string dummyDll, string gameAssembly, string outputFile, string nameSpace,
+        FlatDataDumperVersion dumperVersion, bool forceDump, bool forceSnakeCase, string? namespaceToLookFor,
+        bool verbose, bool suppressWarnings)
     {
-        if (verbose) Log.EnableDebugLogging();
+        if (verbose)
+            Log.EnableDebugLogging();
 
         SuppressWarnings = suppressWarnings;
 
@@ -33,9 +33,10 @@ public static partial class Parser
         GameAssemblyPath = gameAssembly;
         _outputFileName = outputFile;
         _customNameSpace = nameSpace;
+        DumperVersion = dumperVersion;
+        ForceDump = forceDump;
         NameSpace2LookFor = namespaceToLookFor;
         _forceSnakeCase = forceSnakeCase;
-        Force = force;
 
         if (!Directory.Exists(_dummyAssemblyDir))
         {
@@ -45,12 +46,7 @@ public static partial class Parser
             Environment.Exit(1);
         }
 
-        if (string.IsNullOrEmpty(GameAssemblyPath))
-        {
-            Log.Info("No game assembly provided. Skipping assembly analysis.");
-            NoAsmProcessing = true;
-        }
-        else if (!File.Exists(GameAssemblyPath))
+        if (!File.Exists(GameAssemblyPath))
         {
             Log.Global.LogGameAssemblyNotFound(GameAssemblyPath);
             Log.Error("Please provide a valid path using -gameassembly or -a.");
@@ -84,30 +80,27 @@ public static partial class Parser
             Environment.Exit(1);
         }
 
+        Log.Info($"Using FlatData Dumper {DumperVersion} ...");
+
         var asmFbs = AssemblyDefinition.ReadAssembly(flatBuffersDllPath, readerParameters);
 
-        FlatBufferBuilder = new FlatBuilder(asmFbs.MainModule);
-
-        var architecture = NoAsmProcessing ? Architecture.X86 : TypeHelper.DetectArchitecture(GameAssemblyPath);
-        var typeParser = TypeHelper.GetTypeParser(architecture);
-         
-        Log.Info(NoAsmProcessing ? "Using no assembly analysis mode" : $"Detected architecture: {architecture}");
+        FlatBufferBuilder = new FlatBufferBuilder(asmFbs.MainModule);
+        var typeHelper = new TypeHelper();
         Log.Info("Getting a list of types...");
-
         var typeDefs = TypeHelper.GetAllFlatBufferTypes(asm.MainModule, FlatBaseType);
         var schema = new FlatSchema();
         var done = 0;
         foreach (var typeDef in typeDefs)
         {
             Log.Global.LogProgress(done + 1, typeDefs.Count);
-            var table = TypeHelper.TypeToTable(typeParser, typeDef);
+            var table = typeHelper.Type2Table(typeDef);
 
             schema.FlatTables.Add(table);
             done += 1;
         }
 
         Log.Info("Adding enums...");
-        foreach (var fEnum in FlatEnumsToAdd.Select(TypeHelper.TypeToEnum)) schema.FlatEnums.Add(fEnum);
+        foreach (var fEnum in FlatEnumsToAdd.Select(TypeHelper.Type2Enum)) schema.FlatEnums.Add(fEnum);
 
         Log.Info($"Writing schema to {_outputFileName}...");
         File.WriteAllText(_outputFileName, SchemaToString(schema));
@@ -182,7 +175,7 @@ public static partial class Parser
         var isAllUppercase = camelStr.All(char.IsUpper);
         if (string.IsNullOrEmpty(camelStr) || isAllUppercase)
             return camelStr;
-        return CamelToSnakeRegex().Replace(camelStr, "$1_").ToLower();
+        return MyRegex().Replace(camelStr, "$1_").ToLower();
     }
 
     private static string SystemToStringType(TypeDefinition field)
@@ -225,7 +218,10 @@ public static partial class Parser
                 fieldType = "uint8";
                 break;
             default:
-                if (fieldType.StartsWith("System.")) Log.Global.LogUnknownSystemType(fieldType);
+                if (fieldType.StartsWith("System."))
+                {
+                    Log.Global.LogUnknownSystemType(fieldType);
+                }
                 break;
         }
 
@@ -233,5 +229,5 @@ public static partial class Parser
     }
 
     [GeneratedRegex(@"(([a-z])(?=[A-Z][a-zA-Z])|([A-Z])(?=[A-Z][a-z]))")]
-    private static partial Regex CamelToSnakeRegex();
+    private static partial Regex MyRegex();
 }
