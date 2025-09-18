@@ -22,57 +22,17 @@ internal class ArmTypeParser : ITypeParser
             var fieldTypeRef = param.ParameterType;
             var fieldName = param.Name;
 
-            if (fieldTypeRef is GenericInstanceType genericInstance)
-            {
-                fieldType = genericInstance.GenericArguments.First().Resolve();
-                fieldTypeRef = genericInstance.GenericArguments.First();
-            }
+            fieldTypeRef = FieldParser.ExtractGeneric(fieldTypeRef, ref fieldType);
 
             var field = new FlatField(fieldType, TypeHelper.CleanFieldName(fieldName))
             {
                 Offset = kvp.Key
             };
 
-            switch (fieldType.FullName)
-            {
-                case "FlatBuffers.StringOffset":
-                    field.Type = targetType.Module.TypeSystem.String.Resolve();
-                    field.Name = fieldName.EndsWith("Offset")
-                        ? new string([.. fieldName.SkipLast("Offset".Length)])
-                        : fieldName;
-                    field.Name = TypeHelper.CleanFieldName(field.Name);
-                    break;
+            fieldType = FieldParser.ProcessOffsets(targetType, fieldType, field, fieldName, ref fieldTypeRef);
+            fieldType = FieldParser.SetGeneric(fieldTypeRef, fieldType, field);
 
-                case "FlatBuffers.VectorOffset":
-                case "FlatBuffers.Offset":
-                    var newFieldName = fieldName.EndsWith("Offset")
-                        ? new string([.. fieldName.SkipLast("Offset".Length)])
-                        : fieldName;
-                    newFieldName = TypeHelper.CleanFieldName(newFieldName);
-
-                    var method = targetType.Methods.First(m =>
-                        m.Name.Equals(newFieldName, StringComparison.CurrentCultureIgnoreCase)
-                    );
-                    var typeDefinition = method.ReturnType.Resolve();
-                    field.IsArray = fieldType.FullName == "FlatBuffers.VectorOffset";
-                    fieldType = typeDefinition;
-                    fieldTypeRef = method.ReturnType;
-
-                    field.Type = typeDefinition;
-                    field.Name = method.Name;
-                    break;
-            }
-
-            if (fieldTypeRef.IsGenericInstance)
-            {
-                var newGenericInstance = (GenericInstanceType)fieldTypeRef;
-                fieldType = newGenericInstance.GenericArguments.First().Resolve();
-                fieldTypeRef = newGenericInstance.GenericArguments.First();
-                field.Type = fieldType;
-            }
-
-            if (field.Type.IsEnum && !Parser.FlatEnumsToAdd.Contains(fieldType))
-                Parser.FlatEnumsToAdd.Add(fieldType);
+            FieldParser.SaveEnum(field, fieldType);
 
             ret.Fields.Add(field);
         }
