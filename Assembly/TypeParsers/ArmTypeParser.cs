@@ -24,7 +24,7 @@ internal class ArmTypeParser : ITypeParser
 
             fieldTypeRef = FieldParser.ExtractGeneric(fieldTypeRef, ref fieldType);
 
-            var field = new FlatField(fieldType, TypeHelper.CleanFieldName(fieldName))
+            FlatField field = new(fieldType, TypeHelper.CleanFieldName(fieldName))
             {
                 Offset = kvp.Key
             };
@@ -33,6 +33,46 @@ internal class ArmTypeParser : ITypeParser
             fieldType = FieldParser.SetGeneric(fieldTypeRef, fieldType, field);
 
             FieldParser.SaveEnum(field, fieldType);
+            ret.Fields.Add(field);
+        }
+    }
+    
+    private static void NoAsmProcessFields(ref FlatTable ret, MethodDefinition createMethod, TypeDefinition targetType)
+    {
+        foreach (var param in createMethod.Parameters.Skip(1))
+        {
+            var fieldType = param.ParameterType.Resolve();
+            var fieldTypeRef = param.ParameterType;
+            var fieldName = param.Name;
+
+            fieldTypeRef = FieldParser.ExtractGeneric(fieldTypeRef, ref fieldType);
+            FlatField field = new(fieldType, TypeHelper.CleanFieldName(fieldName)); // Needed for BA
+
+            fieldType = FieldParser.ProcessOffsets(targetType, fieldType, field, fieldName, ref fieldTypeRef);
+            fieldType = FieldParser.SetGeneric(fieldTypeRef, fieldType, field);
+
+            FieldParser.SaveEnum(field, fieldType);
+            ret.Fields.Add(field);
+        }
+    }
+
+    private static void ForceProcessFields(ref FlatTable ret, TypeDefinition targetType)
+    {
+        foreach (var method in targetType.GetMethods().Where(m =>
+                     m.IsPublic && m.IsStatic && m.Name.StartsWith("Add") && m.HasParameters &&
+                     m.Parameters.Count == 2 && m.Parameters.First().Name == "builder"))
+        {
+            var param = method.Parameters[1];
+
+            var fieldType = param.ParameterType.Resolve();
+            var fieldTypeRef = param.ParameterType;
+            var fieldName = param.Name;
+
+            fieldTypeRef = FieldParser.ExtractGeneric(fieldTypeRef, ref fieldType);
+            FlatField field = new(fieldType, fieldName);
+
+            fieldTypeRef = FieldParser.ForceProcessOffsets(targetType, fieldType, field, fieldName, fieldTypeRef, method);
+            FieldParser.SetGeneric(fieldTypeRef, fieldType, field);
 
             ret.Fields.Add(field);
         }
@@ -43,7 +83,7 @@ internal class ArmTypeParser : ITypeParser
     {
         Dictionary<int, MethodDefinition> ret = [];
         Dictionary<long, MethodDefinition> typeMethods = [];
-        
+
         foreach (var method in targetType.GetMethods())
         {
             var rva = InstructionsParser.GetMethodRva(method);

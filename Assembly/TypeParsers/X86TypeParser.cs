@@ -48,6 +48,30 @@ internal class X86TypeParser : ITypeParser
         }
     }
 
+    private static void ForceProcessFields(ref FlatTable ret, MethodDefinition createMethod, TypeDefinition targetType)
+    {
+        foreach (var (param, offset) in createMethod.Parameters.Skip(1).Select((p, i) => (p, i + 1)))
+        {
+            var fieldType = param.ParameterType.Resolve();
+            var fieldTypeRef = param.ParameterType;
+            var fieldName = param.Name;
+
+            fieldTypeRef = FieldParser.ExtractGeneric(fieldTypeRef, ref fieldType);
+
+            FlatField field = new(fieldType, TypeHelper.CleanFieldName(fieldName))
+            {
+                Offset = offset
+            };
+
+            fieldType = FieldParser.ProcessOffsets(targetType, fieldType, field, fieldName, ref fieldTypeRef);
+            fieldType = FieldParser.SetGeneric(fieldTypeRef, fieldType, field);
+
+            FieldParser.SaveEnum(field, fieldType);
+
+            ret.Fields.Add(field);
+        }
+    }
+
     private static Dictionary<int, ParameterDefinition> ParseCallsForCreateMethod(MethodDefinition createMethod,
         TypeDefinition targetType)
     {
@@ -131,29 +155,5 @@ internal class X86TypeParser : ITypeParser
         return edxValue.StartsWith("0x")
             ? int.Parse(edxValue[2..], NumberStyles.HexNumber)
             : int.Parse(edxValue, NumberStyles.Integer);
-    }
-
-    private static void ForceProcessFields(ref FlatTable ret, MethodDefinition createMethod, TypeDefinition targetType)
-    {
-        foreach (var (param, offset) in createMethod.Parameters.Skip(1).Select((p, i) => (p, i + 1)))
-        {
-            var fieldType = param.ParameterType.Resolve();
-            var fieldTypeRef = param.ParameterType;
-            var fieldName = param.Name;
-
-            fieldTypeRef = FieldParser.ExtractGeneric(fieldTypeRef, ref fieldType);
-
-            FlatField field = new(fieldType, TypeHelper.CleanFieldName(fieldName))
-            {
-                Offset = offset
-            };
-
-            fieldType = FieldParser.ProcessOffsets(targetType, fieldType, field, fieldName, ref fieldTypeRef);
-            fieldType = FieldParser.SetGeneric(fieldTypeRef, fieldType, field);
-
-            FieldParser.SaveEnum(field, fieldType);
-
-            ret.Fields.Add(field);
-        }
     }
 }
