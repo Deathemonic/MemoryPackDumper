@@ -1,5 +1,6 @@
 ﻿using FbsDumper.CLI;
 using Mono.Cecil;
+using Mono.Cecil.Rocks;
 
 namespace FbsDumper.Assembly;
 
@@ -28,11 +29,11 @@ public static class FieldParser
                 var method = targetType.Methods.First(m =>
                     m.Name.Equals(newFieldName, StringComparison.CurrentCultureIgnoreCase)
                 );
-                
+
                 var typeDefinition = method.ReturnType.Resolve();
-                
+
                 field.IsArray = fieldType.FullName == "FlatBuffers.VectorOffset";
-                
+
                 fieldType = typeDefinition;
                 fieldTypeRef = method.ReturnType;
 
@@ -43,8 +44,9 @@ public static class FieldParser
 
         return fieldType;
     }
-    
-    public static TypeReference ForceProcessOffsets(TypeDefinition targetType, TypeDefinition fieldType, FlatField field,
+
+    private static TypeReference ProcessOffsetsByMethods(TypeDefinition targetType, TypeDefinition fieldType,
+        FlatField field,
         string fieldName, TypeReference fieldTypeRef, MethodDefinition method)
     {
         switch (fieldType.FullName)
@@ -60,7 +62,7 @@ public static class FieldParser
                 var newFieldName = fieldName.EndsWith("Offset")
                     ? new string([.. fieldName.SkipLast("Offset".Length)])
                     : fieldName;
-                newFieldName = TypeHelper.CleanFieldName(newFieldName); // needed for BA
+                newFieldName = TypeHelper.CleanFieldName(newFieldName); // Needed for BA
 
                 if (fieldType.FullName == "FlatBuffers.VectorOffset")
                 {
@@ -77,6 +79,52 @@ public static class FieldParser
         }
 
         return fieldTypeRef;
+    }
+
+    public static void ForceProcessFields(ref FlatTable ret, MethodDefinition createMethod, TypeDefinition targetType)
+    {
+        foreach (var (param, offset) in createMethod.Parameters.Skip(1).Select((p, i) => (p, i + 1)))
+        {
+            var fieldType = param.ParameterType.Resolve();
+            var fieldTypeRef = param.ParameterType;
+            var fieldName = param.Name;
+
+            fieldTypeRef = ExtractGeneric(fieldTypeRef, ref fieldType);
+
+            FlatField field = new(fieldType, TypeHelper.CleanFieldName(fieldName))
+            {
+                Offset = offset
+            };
+
+            fieldType = ProcessOffsets(targetType, fieldType, field, fieldName, ref fieldTypeRef);
+            fieldType = SetGeneric(fieldTypeRef, fieldType, field);
+
+            SaveEnum(field, fieldType);
+
+            ret.Fields.Add(field);
+        }
+    }
+
+    public static void ProcessFieldsByMethods(ref FlatTable ret, TypeDefinition targetType)
+    {
+        foreach (var method in targetType.GetMethods().Where(m =>
+                     m.IsPublic && m.IsStatic && m.Name.StartsWith("Add") && m.HasParameters &&
+                     m.Parameters.Count == 2 && m.Parameters.First().Name == "builder"))
+        {
+            var param = method.Parameters[1];
+
+            var fieldType = param.ParameterType.Resolve();
+            var fieldTypeRef = param.ParameterType;
+            var fieldName = param.Name;
+
+            fieldTypeRef = ExtractGeneric(fieldTypeRef, ref fieldType);
+            FlatField field = new(fieldType, fieldName);
+
+            fieldTypeRef = ProcessOffsetsByMethods(targetType, fieldType, field, fieldName, fieldTypeRef, method);
+            SetGeneric(fieldTypeRef, fieldType, field);
+
+            ret.Fields.Add(field);
+        }
     }
 
     public static TypeReference ExtractGeneric(TypeReference fieldTypeRef, ref TypeDefinition fieldType)

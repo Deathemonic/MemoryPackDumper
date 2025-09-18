@@ -19,9 +19,11 @@ public static partial class Parser
     public static FlatBuilder FlatBufferBuilder = null!;
     public static readonly List<TypeDefinition> FlatEnumsToAdd = [];
     public static bool SuppressWarnings;
+    public static bool NoAsmProcessing;
+    public static bool Force;
 
     public static void Execute(string dummyDll, string gameAssembly, string outputFile, string nameSpace,
-        bool forceSnakeCase, string? namespaceToLookFor, bool verbose, bool suppressWarnings)
+        bool forceSnakeCase, string? namespaceToLookFor, bool force, bool verbose, bool suppressWarnings)
     {
         if (verbose) Log.EnableDebugLogging();
 
@@ -33,6 +35,7 @@ public static partial class Parser
         _customNameSpace = nameSpace;
         NameSpace2LookFor = namespaceToLookFor;
         _forceSnakeCase = forceSnakeCase;
+        Force = force;
 
         if (!Directory.Exists(_dummyAssemblyDir))
         {
@@ -42,7 +45,12 @@ public static partial class Parser
             Environment.Exit(1);
         }
 
-        if (!File.Exists(GameAssemblyPath))
+        if (string.IsNullOrEmpty(GameAssemblyPath))
+        {
+            Log.Info("No game assembly provided. Skipping assembly analysis.");
+            NoAsmProcessing = true;
+        }
+        else if (!File.Exists(GameAssemblyPath))
         {
             Log.Global.LogGameAssemblyNotFound(GameAssemblyPath);
             Log.Error("Please provide a valid path using -gameassembly or -a.");
@@ -80,10 +88,10 @@ public static partial class Parser
 
         FlatBufferBuilder = new FlatBuilder(asmFbs.MainModule);
 
-        var architecture = TypeHelper.DetectArchitecture(GameAssemblyPath);
+        var architecture = NoAsmProcessing ? Architecture.X86 : TypeHelper.DetectArchitecture(GameAssemblyPath);
         var typeParser = TypeHelper.GetTypeParser(architecture);
-
-        Log.Info($"Detected architecture: {architecture}");
+         
+        Log.Info(NoAsmProcessing ? "Using no assembly analysis mode" : $"Detected architecture: {architecture}");
         Log.Info("Getting a list of types...");
 
         var typeDefs = TypeHelper.GetAllFlatBufferTypes(asm.MainModule, FlatBaseType);

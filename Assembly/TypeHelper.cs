@@ -11,7 +11,7 @@ namespace FbsDumper.Assembly;
 internal static class TypeHelper
 {
     public static readonly InstructionsParser InstructionsResolver = new(Parser.GameAssemblyPath);
-    
+
     public static ITypeParser GetTypeParser(Architecture architecture)
     {
         return architecture switch
@@ -69,14 +69,34 @@ internal static class TypeHelper
             m is { IsStatic: true, IsPublic: true }
         );
 
-        if (createMethod == null)
+        if (Parser.NoAsmProcessing)
         {
-            Log.Warning($"{targetType.FullName} does NOT contain a Create{typeName} function. Fields will be empty");
-            ret.NoCreate = true;
+            if (createMethod == null)
+                return Parser.Force
+                    ? ProcessWithForceMethod(ref ret, targetType)
+                    : ProcessWithoutCreateMethod(ret, targetType);
+
+            FieldParser.ForceProcessFields(ref ret, createMethod, targetType);
             return ret;
         }
 
+        if (createMethod == null)
+            return ProcessWithoutCreateMethod(ret, targetType);
+
         typeParser.ProcessFields(ref ret, createMethod, targetType);
+        return ret;
+    }
+
+    private static FlatTable ProcessWithForceMethod(ref FlatTable ret, TypeDefinition targetType)
+    {
+        FieldParser.ProcessFieldsByMethods(ref ret, targetType);
+        return ret;
+    }
+
+    private static FlatTable ProcessWithoutCreateMethod(FlatTable ret, TypeDefinition targetType)
+    {
+        Log.Warning($"{targetType.FullName} does NOT contain a Create{targetType.Name} function. Fields will be empty");
+        ret.NoCreate = true;
         return ret;
     }
 
@@ -110,14 +130,14 @@ internal static class TypeHelper
         return !string.IsNullOrEmpty(targetDecimal) &&
                long.TryParse(targetDecimal, NumberStyles.Integer, null, out result);
     }
-    
+
     public static List<InstructionsAnalyzer.CallInfo> GetAnalyzedCalls(MethodDefinition createMethod)
     {
         var instructions = InstructionsResolver.GetInstructions(createMethod);
         var analyzer = InstructionsAnalyzer.GetAnalyzer(InstructionsResolver.Architecture);
         return analyzer.AnalyzeCalls(instructions);
     }
-    
+
     public static long GetEndMethodRva(TypeDefinition targetType)
     {
         var endMethod = targetType.Methods.First(m => m.Name == $"End{targetType.Name}");

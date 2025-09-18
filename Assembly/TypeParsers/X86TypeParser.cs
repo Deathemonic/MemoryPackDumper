@@ -19,7 +19,7 @@ internal class X86TypeParser : ITypeParser
         }
         catch (Exception)
         {
-            ForceProcessFields(ref ret, createMethod, targetType);
+            FieldParser.ForceProcessFields(ref ret, createMethod, targetType);
             return;
         }
 
@@ -37,30 +37,6 @@ internal class X86TypeParser : ITypeParser
             FlatField field = new(fieldType, TypeHelper.CleanFieldName(fieldName))
             {
                 Offset = kvp.Key
-            };
-
-            fieldType = FieldParser.ProcessOffsets(targetType, fieldType, field, fieldName, ref fieldTypeRef);
-            fieldType = FieldParser.SetGeneric(fieldTypeRef, fieldType, field);
-
-            FieldParser.SaveEnum(field, fieldType);
-
-            ret.Fields.Add(field);
-        }
-    }
-
-    private static void ForceProcessFields(ref FlatTable ret, MethodDefinition createMethod, TypeDefinition targetType)
-    {
-        foreach (var (param, offset) in createMethod.Parameters.Skip(1).Select((p, i) => (p, i + 1)))
-        {
-            var fieldType = param.ParameterType.Resolve();
-            var fieldTypeRef = param.ParameterType;
-            var fieldName = param.Name;
-
-            fieldTypeRef = FieldParser.ExtractGeneric(fieldTypeRef, ref fieldType);
-
-            FlatField field = new(fieldType, TypeHelper.CleanFieldName(fieldName))
-            {
-                Offset = offset
             };
 
             fieldType = FieldParser.ProcessOffsets(targetType, fieldType, field, fieldName, ref fieldTypeRef);
