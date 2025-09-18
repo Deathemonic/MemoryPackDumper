@@ -5,14 +5,26 @@ Originally made for **Blue Archive**, should theoretically work with other games
 
 ## Usage
 ```bash
-# Build the project
-dotnet publish --configuration Release
-
-# Run with required parameters
-FbsDumper.exe --dummy-dll "path/to/DummyDll" --game-assembly "path/to/libil2cpp.so"
-
 # Show help
 FbsDumper.exe --help
+
+# Generate schema using assembly
+FbsDumper.exe --dummy-dll "path/to/DummyDll" --game-assembly "path/to/libil2cpp.so"
+
+# Generate schema without assembly
+FbsDumper.exe --dummy-dll "path/to/DummyDll"
+```
+
+## Build
+1. Install [.NET SDK](https://dotnet.microsoft.com/en-us/download)
+2. Clone this repository
+```sh
+git clone https://github.com/ArkanDash/FbsDumper
+cd FbsDumper
+```
+3. Build using `dotnet`
+```sh
+dotnet build
 ```
 
 ### Options

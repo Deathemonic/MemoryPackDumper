@@ -182,7 +182,7 @@ public static partial class Parser
         var isAllUppercase = camelStr.All(char.IsUpper);
         if (string.IsNullOrEmpty(camelStr) || isAllUppercase)
             return camelStr;
-        return MyRegex().Replace(camelStr, "$1_").ToLower();
+        return CamelToSnakeRegex().Replace(camelStr, "$1_").ToLower();
     }
 
     private static string SystemToStringType(TypeDefinition field)
@@ -233,5 +233,5 @@ public static partial class Parser
     }
 
     [GeneratedRegex(@"(([a-z])(?=[A-Z][a-zA-Z])|([A-Z])(?=[A-Z][a-z]))")]
-    private static partial Regex MyRegex();
+    private static partial Regex CamelToSnakeRegex();
 }
