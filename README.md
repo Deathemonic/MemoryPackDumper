@@ -17,11 +17,12 @@ FbsDumper.exe --help
 
 ### Options
 - `-d, --dummy-dll`: Specifies the dummy DLL directory (Required)
-- `-a, --game-assembly`: Specifies the path to libil2cpp.so (Required)  
+- `-a, --game-assembly`: Specifies the path to libil2cpp.so (ARM) or GameAssembly.dll (x86/x64) (Optional: Skip assembly analysis)
 - `-o, --output-file`: Specifies the output file (Default: BlueArchive.fbs)
 - `-n, --namespace`: Specifies the flatdata namespace (Default: FlatData)
 - `-s, --force-snake-case`: Force snake case conversion
 - `-nl, --namespace-to-look-for`: Specifies the namespace to look for
+- `-f, --force`: Force processing using Add methods when no Create method exists
 - `-v, --verbose`: Enable verbose debug logging
 - `-sw, --suppress-warnings`: Suppress warning messages
 
