@@ -49,13 +49,13 @@ jobs:
         run: dotnet restore
 
       - name: Build
-        run: dotnet build --configuration Release --no-restore
+        run: dotnet build --configuration Debug --no-restore
 
       - name: Test
-        run: dotnet test --configuration Release --no-build --verbosity normal
+        run: dotnet test --configuration Debug --no-build --verbosity normal
 
       - name: Publish
-        run: dotnet publish --configuration Release --runtime ${{ matrix.rid }} --output ./publish/${{ matrix.rid }}
+        run: dotnet publish --configuration Debug --runtime ${{ matrix.rid }} --output ./publish/${{ matrix.rid }}
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

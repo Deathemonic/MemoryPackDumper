@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release-name:
+        description: 'The name for the new release'
+        required: true
+        default: 'Development Build'
+      release-tag:
+        description: 'The tag for the new release (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+jobs:
+  build:
+    name: Build for ${{ matrix.os }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+
+    permissions:
+      contents: write
+
+    strategy:
+      matrix:
+        include:
+          - os: windows
+            arch: x86_64
+            runner: windows-latest
+            rid: win-x64
+          - os: macos
+            arch: x86_64
+            runner: macos-15
+            rid: osx-x64
+          - os: macos
+            arch: aarch64
+            runner: macos-15
+            rid: osx-arm64
+          - os: linux
+            arch: x86_64
+            runner: ubuntu-latest
+            rid: linux-x64
+          - os: linux
+            arch: aarch64
+            runner: ubuntu-24.04-arm
+            rid: linux-arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test --configuration Release --no-build --verbosity normal
+
+      - name: Publish
+        run: dotnet publish --configuration Release --runtime ${{ matrix.rid }} --self-contained true --output ./publish/${{ matrix.rid }}
+      
+      - name: Create Zip Archive
+        uses: vimtor/action-zip@v1.2
+        with:
+          files: ./publish/${{ matrix.rid }}
+          dest: ${{ github.event.repository.name }}-${{ github.event.inputs.release-tag }}-${{ matrix.rid }}.zip
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.event.inputs.release-name }}
+          tag_name: ${{ github.event.inputs.release-tag }}
+          files: ${{ github.event.repository.name }}-${{ github.event.inputs.release-tag }}-${{ matrix.rid }}.zip
