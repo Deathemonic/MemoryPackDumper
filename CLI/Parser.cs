@@ -16,7 +16,7 @@ public static partial class Parser
     private static bool _forceSnakeCase;
     public static string? NameSpace2LookFor;
     private static readonly string FlatBaseType = "FlatBuffers.IFlatbufferObject";
-    public static FlatBufferBuilder FlatBufferBuilder = null!;
+    public static FlatBuilder FlatBufferBuilder = null!;
     public static readonly List<TypeDefinition> FlatEnumsToAdd = [];
     public static bool SuppressWarnings;
 
@@ -78,7 +78,7 @@ public static partial class Parser
 
         var asmFbs = AssemblyDefinition.ReadAssembly(flatBuffersDllPath, readerParameters);
 
-        FlatBufferBuilder = new FlatBufferBuilder(asmFbs.MainModule);
+        FlatBufferBuilder = new FlatBuilder(asmFbs.MainModule);
 
         var architecture = TypeHelper.DetectArchitecture(GameAssemblyPath);
         var typeParser = TypeHelper.GetTypeParser(architecture);
@@ -226,33 +226,4 @@ public static partial class Parser
 
     [GeneratedRegex(@"(([a-z])(?=[A-Z][a-zA-Z])|([A-Z])(?=[A-Z][a-z]))")]
     private static partial Regex MyRegex();
-}
-
-public class FlatBufferBuilder
-{
-    public readonly long EndObject;
-    public readonly Dictionary<long, MethodDefinition> Methods;
-    public readonly long StartObject;
-
-    public FlatBufferBuilder(ModuleDefinition flatBuffersDllModule)
-    {
-        Methods = [];
-        var flatBufferBuilderType = flatBuffersDllModule.GetType("FlatBuffers.FlatBufferBuilder");
-        foreach (var method in flatBufferBuilderType.Methods)
-        {
-            var rva = InstructionsParser.GetMethodRva(method);
-            {
-                switch (method.Name)
-                {
-                    case "StartObject":
-                        StartObject = rva;
-                        break;
-                    case "EndObject":
-                        EndObject = rva;
-                        break;
-                }
-            }
-            Methods.Add(rva, method);
-        }
-    }
 }
