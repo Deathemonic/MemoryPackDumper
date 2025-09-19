@@ -6,7 +6,7 @@ on:
       release-name:
         description: 'The name for the new release'
         required: true
-        default: 'Development Build'
+        default: 'Release'
       release-tag:
         description: 'The tag for the new release (e.g., v1.0.0)'
         required: true
@@ -68,7 +68,14 @@ jobs:
 
       - name: Publish
         run: dotnet publish --configuration Release --runtime ${{ matrix.rid }} --output ./publish/${{ matrix.rid }}
-      
+
+      - name: Remove dev files
+        shell: bash
+        run: |
+          find ./publish/${{ matrix.rid }} -name "*.pdb" -type f -delete
+          find ./publish/${{ matrix.rid }} -name "*.dbg" -type f -delete
+          find ./publish/${{ matrix.rid }} -name "*.dsym" -type d -exec rm -rf {} +
+
       - name: Create Zip Archive
         uses: vimtor/action-zip@v1.2
         with:
