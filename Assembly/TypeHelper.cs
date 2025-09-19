@@ -47,12 +47,7 @@ internal static class TypeHelper
             ret = [.. ret.Where(t => t.Namespace == Parser.NameSpace2LookFor)];
 
         // Dedupe
-        ret =
-        [
-            .. ret
-                .GroupBy(t => t.Name)
-                .Select(g => g.First())
-        ];
+        ret = [..ret.DistinctBy(t => t.Name)];
 
         return ret;
     }

@@ -46,10 +46,6 @@ dotnet build
 - `-v, --verbose`: Enable verbose debug logging
 - `-sw, --suppress-warnings`: Suppress warning messages
 
-## TODO
-
-- Default values support
-
 > [!IMPORTANT]  
 > **Disclaimer:** This software is made solely for educational purposes. I do not claim any responsibility for any usage
 > of this software.
