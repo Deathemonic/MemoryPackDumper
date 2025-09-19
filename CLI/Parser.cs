@@ -1,9 +1,10 @@
-using System.Text;
+using System.Buffers;
 using System.Text.RegularExpressions;
 using FbsDumper.Assembly;
 using FbsDumper.Helpers;
 using FbsDumper.Instructions;
 using Mono.Cecil;
+using Utf8StringInterpolation;
 
 namespace FbsDumper.CLI;
 
@@ -21,6 +22,21 @@ public static partial class Parser
     public static bool SuppressWarnings;
     public static bool NoAsmProcessing;
     public static bool Force;
+
+    private static readonly Dictionary<string, string> TypeMap = new()
+    {
+        ["System.String"] = "string",
+        ["System.Int16"] = "short",
+        ["System.UInt16"] = "ushort",
+        ["System.Int32"] = "int",
+        ["System.UInt32"] = "uint",
+        ["System.Int64"] = "long",
+        ["System.UInt64"] = "ulong",
+        ["System.Boolean"] = "bool",
+        ["System.Single"] = "float",
+        ["System.SByte"] = "int8",
+        ["System.Byte"] = "uint8"
+    };
 
     public static void Execute(string dummyDll, string gameAssembly, string outputFile, string nameSpace,
         bool forceSnakeCase, string? namespaceToLookFor, bool force, bool verbose, bool suppressWarnings)
@@ -90,13 +106,16 @@ public static partial class Parser
 
         var architecture = NoAsmProcessing ? Architecture.X86 : TypeHelper.DetectArchitecture(GameAssemblyPath);
         var typeParser = TypeHelper.GetTypeParser(architecture);
-         
+
         Log.Info(NoAsmProcessing ? "Using no assembly analysis mode" : $"Detected architecture: {architecture}");
         Log.Info("Getting a list of types...");
 
         var typeDefs = TypeHelper.GetAllFlatBufferTypes(asm.MainModule, FlatBaseType);
-        var schema = new FlatSchema();
+
+        FlatSchema schema = new();
+
         var done = 0;
+
         foreach (var typeDef in typeDefs)
         {
             Log.Global.LogProgress(done + 1, typeDefs.Count);
@@ -110,71 +129,74 @@ public static partial class Parser
         foreach (var fEnum in FlatEnumsToAdd.Select(TypeHelper.TypeToEnum)) schema.FlatEnums.Add(fEnum);
 
         Log.Info($"Writing schema to {_outputFileName}...");
-        File.WriteAllText(_outputFileName, SchemaToString(schema));
+
+        WriteSchema(_outputFileName, schema);
+
         Log.Info("Done.");
     }
 
-    private static string SchemaToString(FlatSchema schema)
+    private static void WriteSchema(string fileName, FlatSchema schema)
     {
-        var sb = new StringBuilder();
+        using var buffer = Utf8String.CreateWriter(out var stringWriter);
 
-        if (!string.IsNullOrEmpty(_customNameSpace)) sb.AppendLine($"namespace {_customNameSpace};\n");
+        if (!string.IsNullOrEmpty(_customNameSpace))
+            stringWriter.AppendFormat($"namespace {_customNameSpace};\n\n");
 
-        foreach (var flatEnum in schema.FlatEnums) sb.AppendLine(TableEnumToString(flatEnum));
+        foreach (var flatEnum in schema.FlatEnums)
+        {
+            WriteTableEnum(ref stringWriter, flatEnum);
+            stringWriter.AppendLine();
+        }
 
-        foreach (var table in schema.FlatTables) sb.AppendLine(TableToString(table));
+        foreach (var flatTable in schema.FlatTables)
+        {
+            WriteTable(ref stringWriter, flatTable);
+            stringWriter.AppendLine();
+        }
 
-        return sb.ToString();
+        stringWriter.Flush();
+
+        File.WriteAllBytes(fileName, buffer.ToArray());
     }
 
-    private static string TableToString(FlatTable table)
+    private static void WriteTable<TBufferWriter>(ref Utf8StringWriter<TBufferWriter> writer, FlatTable table)
+        where TBufferWriter : IBufferWriter<byte>
     {
-        var sb = new StringBuilder();
-        sb.AppendLine($"table {table.TableName} {{");
+        writer.AppendFormat($"table {table.TableName} {{\n");
 
-        if (table.NoCreate)
-            sb.AppendLine("\t// No Create method");
+        if (table.NoCreate) writer.AppendLiteral("\t// No Create method\n");
 
-        foreach (var field in table.Fields) sb.AppendLine(TableFieldToString(field));
+        foreach (var tableField in table.Fields)
+            WriteTableField(ref writer, tableField);
 
-        sb.AppendLine("}");
-
-        return sb.ToString();
+        writer.AppendLiteral("}\n");
     }
 
-    private static string TableEnumToString(FlatEnum fEnum)
+    private static void WriteTableEnum<TBufferWriter>(ref Utf8StringWriter<TBufferWriter> writer, FlatEnum fEnum)
+        where TBufferWriter : IBufferWriter<byte>
     {
-        var sb = new StringBuilder();
-        sb.AppendLine($"enum {fEnum.EnumName} : {SystemToStringType(fEnum.Type)} {{");
+        var enumTypeName = SystemToStringType(fEnum.Type);
+        writer.AppendFormat($"enum {fEnum.EnumName} : {enumTypeName} {{\n");
 
         for (var i = 0; i < fEnum.Fields.Count; i++)
         {
             var field = fEnum.Fields[i];
-            sb.AppendLine(TableEnumFieldToString(field, i == fEnum.Fields.Count - 1));
+            var isLast = i == fEnum.Fields.Count - 1;
+            writer.AppendFormat($"\t{field.Name} = {field.Value}{(isLast ? "" : ",")}\n");
         }
 
-        sb.AppendLine("}");
-
-        return sb.ToString();
+        writer.AppendLiteral("}\n");
     }
 
-    private static string TableEnumFieldToString(FlatEnumField field, bool isLast = false)
+    private static void WriteTableField<TBufferWriter>(ref Utf8StringWriter<TBufferWriter> writer, FlatField field)
+        where TBufferWriter : IBufferWriter<byte>
     {
-        return $"\t{field.Name} = {field.Value}{(isLast ? "" : ",")}";
-    }
-
-    private static string TableFieldToString(FlatField field)
-    {
-        var stringBuilder = new StringBuilder();
-        stringBuilder.Append($"\t{(_forceSnakeCase ? CamelToSnake(field.Name) : field.Name)}: ");
-
+        var fieldName = _forceSnakeCase ? CamelToSnake(field.Name) : field.Name;
         var fieldType = SystemToStringType(field.Type);
 
-        fieldType = field.IsArray ? $"[{fieldType}]" : fieldType;
+        if (field.IsArray) fieldType = $"[{fieldType}]";
 
-        stringBuilder.Append($"{fieldType}; // index 0x{field.Offset:X}");
-
-        return stringBuilder.ToString();
+        writer.AppendFormat($"\t{fieldName}: {fieldType}; // index 0x{field.Offset:X}\n");
     }
 
     private static string CamelToSnake(string camelStr)
@@ -187,49 +209,13 @@ public static partial class Parser
 
     private static string SystemToStringType(TypeDefinition field)
     {
-        var fieldType = field.Name;
+        var fullName = field.FullName;
+        if (TypeMap.TryGetValue(fullName, out var type)) return type;
 
-        switch (field.FullName)
-        {
-            case "System.String":
-                fieldType = "string";
-                break;
-            case "System.Int16":
-                fieldType = "short";
-                break;
-            case "System.UInt16":
-                fieldType = "ushort";
-                break;
-            case "System.Int32":
-                fieldType = "int";
-                break;
-            case "System.UInt32":
-                fieldType = "uint";
-                break;
-            case "System.Int64":
-                fieldType = "long";
-                break;
-            case "System.UInt64":
-                fieldType = "ulong";
-                break;
-            case "System.Boolean":
-                fieldType = "bool";
-                break;
-            case "System.Single":
-                fieldType = "float";
-                break;
-            case "System.SByte":
-                fieldType = "int8";
-                break;
-            case "System.Byte":
-                fieldType = "uint8";
-                break;
-            default:
-                if (fieldType.StartsWith("System.")) Log.Global.LogUnknownSystemType(fieldType);
-                break;
-        }
+        var name = field.Name;
+        if (name.StartsWith("System.")) Log.Global.LogUnknownSystemType(name);
 
-        return fieldType;
+        return name;
     }
 
     [GeneratedRegex(@"(([a-z])(?=[A-Z][a-zA-Z])|([A-Z])(?=[A-Z][a-z]))")]
