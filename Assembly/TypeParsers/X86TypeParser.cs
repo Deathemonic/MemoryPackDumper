@@ -53,6 +53,7 @@ internal class X86TypeParser : ITypeParser
     {
         Dictionary<int, ParameterDefinition> ret = [];
         Dictionary<long, MethodDefinition> typeMethods = [];
+        HashSet<int> seenParameterIndices = [];
 
         foreach (var method in createMethod.Parameters[0].ParameterType.Resolve().GetMethods())
         {
@@ -65,6 +66,7 @@ internal class X86TypeParser : ITypeParser
         var hasStarted = false;
         var max = 0;
         var cur = 0;
+        var fieldIndex = 0;
 
         var endMethodRva = TypeHelper.GetEndMethodRva(targetType);
 
@@ -99,7 +101,10 @@ internal class X86TypeParser : ITypeParser
 
                 default:
                     if (!hasStarted)
+                    {
                         Log.Global.LogSkippingCall((ulong)target, "StartObject hasn't been called yet");
+                        continue;
+                    }
 
                     if (!typeMethods.TryGetValue(target, out _))
                     {
@@ -113,8 +118,25 @@ internal class X86TypeParser : ITypeParser
                         continue;
                     }
 
+                    var paramIndex = (int)call.ArgIndex! - 1;
+                    var parameter = createMethod.Parameters[paramIndex];
+                    
+                    if (parameter.Name == "builder")
+                    {
+                        Log.Debug($"Skipping builder parameter '{parameter.Name}' at index {paramIndex}");
+                        continue;
+                    }
+                    
+                    if (seenParameterIndices.Contains(paramIndex))
+                    {
+                        Log.Debug($"Skipping duplicate parameter at index {paramIndex}");
+                        continue;
+                    }
+
                     var edxAsInt = ParseEdxValue(call);
-                    ret.Add(edxAsInt, createMethod.Parameters[(int)call.ArgIndex! - 1]);
+                    ret.Add(fieldIndex, parameter);
+                    seenParameterIndices.Add(paramIndex);
+                    fieldIndex++; 
                     cur += 1;
                     break;
             }
