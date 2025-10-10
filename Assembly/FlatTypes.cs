@@ -1,5 +1,5 @@
 using Mono.Cecil;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace FbsDumper.Assembly;
 
