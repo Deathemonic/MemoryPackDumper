@@ -1,8 +1,15 @@
 # FbsDumper
 
-A tool to recover FlatBuffer schema definitions from game assemblies using assembly instruction parsing.
+A tool to recover FlatBuffer schema definitions from game assemblies with assembly instruction parsing.
 
-Originally made for **Blue Archive**, should theoretically work with other games but is untested.
+*Originally made for **Blue Archive**, should theoretically work with other games but is untested.*
+
+## Install
+
+You can download the latest pre-build binaries at [Releases](https://github.com/ArkanDash/FbsDumper/releases)
+
+[Windows](https://github.com/ArkanDash/FbsDumper/releases/latest/download/FbsDumper-v2.1.0-win-x64.zip) | [Linux](https://github.com/ArkanDash/FbsDumper/releases/latest/download/FbsDumper-v2.1.0-linux-x64.zip) | [MacOS](https://github.com/ArkanDash/FbsDumper/releases/latest/download/FbsDumper-v2.1.0-osx-arm64.zip) 
+
 
 ## Usage
 
@@ -50,4 +57,4 @@ dotnet build
 > **Disclaimer:** This software is made solely for educational purposes. I do not claim any responsibility for any usage
 > of this software.
 
-Copyright© [Hiro420](https://github.com/Hiro420)
+Copyright © 2025 [Hiro420](https://github.com/Hiro420)
