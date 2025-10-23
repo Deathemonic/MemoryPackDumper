@@ -53,3 +53,7 @@ dotnet build
 > **Disclaimer:** This software is made solely for educational purposes. I do not claim any responsibility for any usage
 > of this software.
 
+## Acknowledgement
+
+- [ArkanDash/FbsDumper](https://github.com/ArkanDash/FbsDumper)
+- [Hiro420/FbsDumperV2](https://github.com/Hiro420/FbsDumperV2)
