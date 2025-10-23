@@ -1,5 +1,6 @@
 using Mono.Cecil;
 using Mono.Collections.Generic;
+using ZLinq;
 
 namespace MemoryPackDumper.Assembly;
 
@@ -95,8 +96,9 @@ public static class AttributeExtractor
 
     public static void ExtractMethodAttributes(MethodDefinition methodDef, MemoryPackMethod method)
     {
-        foreach (var attrName in methodDef.CustomAttributes.Select(attr =>
-                     GetAttributeShortName(attr.AttributeType.Name))) method.Attributes.Add(attrName);
+        foreach (var attrName in methodDef.CustomAttributes.AsValueEnumerable()
+                     .Select(attr => GetAttributeShortName(attr.AttributeType.Name)))
+            method.Attributes.Add(attrName);
     }
 
     private static string GetAttributeShortName(string attributeName)

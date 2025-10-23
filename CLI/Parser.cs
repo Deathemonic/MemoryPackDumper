@@ -3,6 +3,7 @@ using MemoryPackDumper.Helpers;
 using MemoryPackDumper.Assembly;
 using Mono.Cecil;
 using Utf8StringInterpolation;
+using ZLinq;
 
 namespace MemoryPackDumper.CLI;
 
@@ -10,7 +11,7 @@ public static class Parser
 {
     private static string _dummyAssemblyDir = "DummyDll";
     private static string _outputFileName = "MemoryPack.cs";
-    private static string? _customNameSpace = "FlatData";
+    private static string? _customNameSpace = "MemoryPackData";
     public static string? NameSpace2LookFor;
     public static readonly List<TypeDefinition> MemoryPackEnumsToAdd = [];
     public static bool SuppressWarnings;
@@ -59,7 +60,7 @@ public static class Parser
 
         MemoryPackSchema schema = new();
         var processedTypes = new HashSet<string>();
-        var typesToProcess = new Queue<string>(typeDefs.Select(t => t.FullName));
+        var typesToProcess = new Queue<string>(typeDefs.AsValueEnumerable().Select(t => t.FullName).ToArray());
 
         while (typesToProcess.Count > 0)
         {
@@ -85,8 +86,10 @@ public static class Parser
         }
 
         Log.Info("Adding enums...");
-        foreach (var fEnum in MemoryPackEnumsToAdd.Select(MemberParser.TypeToEnum))
+        foreach (var fEnum in MemoryPackEnumsToAdd.AsValueEnumerable().Select(MemberParser.TypeToEnum))
+        {
             schema.Enums.Add(fEnum);
+        }
 
         Log.Info($"Writing C# code to {_outputFileName}...");
 
@@ -110,7 +113,10 @@ public static class Parser
                          typeStr.Contains("List<") || typeStr.Contains("Dictionary<") || typeStr.Contains("HashSet<")))
             namespaces.Add("System.Collections.Generic");
 
-        foreach (var ns in namespaces.OrderBy(n => n)) stringWriter.AppendFormat($"using {ns};\n");
+        foreach (var ns in namespaces.AsValueEnumerable().OrderBy(n => n))
+        {
+            stringWriter.AppendFormat($"using {ns};\n");
+        }
         stringWriter.AppendLine();
 
         if (!string.IsNullOrEmpty(_customNameSpace)) stringWriter.AppendFormat($"namespace {_customNameSpace}\n{{\n");

@@ -1,5 +1,6 @@
 using MemoryPackDumper.Helpers;
 using Mono.Cecil;
+using ZLinq;
 
 namespace MemoryPackDumper.Assembly;
 
@@ -26,7 +27,7 @@ public static class MemberParser
 
     private static bool IsRecordType(TypeDefinition typeDef)
     {
-        return typeDef.CustomAttributes.Any(a =>
+        return typeDef.CustomAttributes.AsValueEnumerable().Any(a =>
                    a.AttributeType.FullName == "System.Runtime.CompilerServices.CompilerGeneratedAttribute") ||
                typeDef.BaseType?.Name == "Record";
     }
@@ -34,7 +35,7 @@ public static class MemberParser
     private static void ProcessProperties(TypeDefinition typeDef, MemoryPackClass memoryPackClass,
         HashSet<string> discoveredTypes)
     {
-        foreach (var property in typeDef.Properties.Where(p => p.GetMethod is { IsStatic: false }))
+        foreach (var property in typeDef.Properties.AsValueEnumerable().Where(p => p.GetMethod is { IsStatic: false }))
         {
             var member = CreateMemberFromProperty(property);
             if (!ShouldIncludeMember(member, property.GetMethod.IsPublic)) continue;
@@ -47,7 +48,7 @@ public static class MemberParser
     private static void ProcessFields(TypeDefinition typeDef, MemoryPackClass memoryPackClass,
         HashSet<string> discoveredTypes)
     {
-        foreach (var field in typeDef.Fields.Where(f => !f.IsStatic && !f.IsLiteral))
+        foreach (var field in typeDef.Fields.AsValueEnumerable().Where(f => !f.IsStatic && !f.IsLiteral))
         {
             var member = CreateMemberFromField(field);
             if (!ShouldIncludeMember(member, field.IsPublic)) continue;
@@ -64,7 +65,7 @@ public static class MemberParser
 
     private static void SortMembersByOrder(MemoryPackClass memoryPackClass)
     {
-        if (!memoryPackClass.Members.Any(m => m.Order.HasValue)) return;
+        if (!memoryPackClass.Members.AsValueEnumerable().Any(m => m.Order.HasValue)) return;
 
         memoryPackClass.Members.Sort((a, b) =>
         {
@@ -98,12 +99,13 @@ public static class MemberParser
     private static bool IsMemoryPackConstructor(MethodDefinition method)
     {
         return method.IsConstructor &&
-               method.CustomAttributes.Any(a => a.AttributeType.Name == "MemoryPackConstructorAttribute");
+               method.CustomAttributes.AsValueEnumerable()
+                   .Any(a => a.AttributeType.Name == "MemoryPackConstructorAttribute");
     }
 
     private static bool IsCallbackMethod(MethodDefinition method)
     {
-        return method.CustomAttributes.Any(a =>
+        return method.CustomAttributes.AsValueEnumerable().Any(a =>
             a.AttributeType.Name == "MemoryPackOnSerializingAttribute" ||
             a.AttributeType.Name == "MemoryPackOnSerializedAttribute" ||
             a.AttributeType.Name == "MemoryPackOnDeserializingAttribute" ||
@@ -153,7 +155,7 @@ public static class MemberParser
         var underlyingType = GetEnumUnderlyingType(typeDef);
         var memoryPackEnum = new MemoryPackEnum(underlyingType, typeDef.Name);
 
-        foreach (var fieldDef in typeDef.Fields.Where(f => f.HasConstant))
+        foreach (var fieldDef in typeDef.Fields.AsValueEnumerable().Where(f => f.HasConstant))
         {
             var enumField = new MemoryPackEnumField(fieldDef.Name, Convert.ToInt64(fieldDef.Constant));
             memoryPackEnum.Fields.Add(enumField);

@@ -1,5 +1,6 @@
 using MemoryPackDumper.Helpers;
 using Mono.Cecil;
+using ZLinq;
 
 namespace MemoryPackDumper.Assembly;
 
@@ -42,7 +43,7 @@ public static class TypeStringConverter
 
         if (baseType.Contains('`')) baseType = baseType[..baseType.IndexOf('`')];
 
-        var genericArgs = string.Join(", ", genericInstance.GenericArguments.Select(TypeToString));
+        var genericArgs = genericInstance.GenericArguments.AsValueEnumerable().Select(TypeToString).JoinToString(", ");
         return $"{baseType}<{genericArgs}>";
     }
 

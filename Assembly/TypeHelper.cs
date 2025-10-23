@@ -1,5 +1,6 @@
 using MemoryPackDumper.CLI;
 using Mono.Cecil;
+using ZLinq;
 
 namespace MemoryPackDumper.Assembly;
 
@@ -9,16 +10,16 @@ internal static class TypeHelper
     {
         List<TypeDefinition> ret =
         [
-            .. module.GetTypes().Where(t =>
-                t.CustomAttributes.Any(a => a.AttributeType.Name == "MemoryPackableAttribute")
-            )
+            .. module.GetTypes().AsValueEnumerable().Where(t =>
+                t.CustomAttributes.AsValueEnumerable().Any(a => a.AttributeType.Name == "MemoryPackableAttribute")
+            ).ToArray()
         ];
 
         if (!string.IsNullOrEmpty(Parser.NameSpace2LookFor))
-            ret = [.. ret.Where(t => t.Namespace == Parser.NameSpace2LookFor)];
+            ret = [..ret.AsValueEnumerable().Where(t => t.Namespace == Parser.NameSpace2LookFor).ToArray()];
 
         // Dedupe
-        ret = [..ret.DistinctBy(t => t.FullName)];
+        ret = [..ret.AsValueEnumerable().DistinctBy(t => t.FullName).ToArray()];
 
         return ret;
     }

@@ -14,7 +14,7 @@ public static class Args
     public static void Run(
         string dummyDll,
         string outputFile = "MemoryPack.cs",
-        string @namespace = "FlatData",
+        string @namespace = "MemoryPackData",
         string? namespaceToLookFor = null,
         bool verbose = false,
         bool suppressWarnings = false)
