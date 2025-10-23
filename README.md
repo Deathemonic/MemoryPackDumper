@@ -1,6 +1,6 @@
 # MemoryPackDumper
 
-A tool to recover MemoryPack C# class definitions from IL2CPP game assemblies.
+A tool to recover MemoryPack class definitions from game assemblies.
 
 *Originally made for **Blue Archive**, should theoretically work with other games that use MemoryPack.*
 
@@ -8,20 +8,19 @@ A tool to recover MemoryPack C# class definitions from IL2CPP game assemblies.
 
 You can download the latest pre-build binaries at [Releases](https://github.com/Deathemonic/MemoryPackDumper/releases)
 
-[Windows](https://github.com/Deathemonic/MemoryPackDumper/releases/latest/download/FbsDumper-v2.1.0-win-x64.zip) | [Linux](https://github.com/Deathemonic/MemoryPackDumper/releases/latest/download/FbsDumper-v2.1.0-linux-x64.zip) | [MacOS](https://github.com/Deathemonic/MemoryPackDumper/releases/latest/download/FbsDumper-v2.1.0-osx-arm64.zip) 
-
+[Windows](https://github.com/Deathemonic/MemoryPackDumper/releases/latest/download/MemoryPackDumper-win-x64.zip) | [Linux](https://github.com/Deathemonic/MemoryPackDumper/releases/latest/download/MemoryPackDumper-linux-x64.zip) | [MacOS](https://github.com/Deathemonic/MemoryPackDumper/releases/latest/download/MemoryPackDumper-osx-arm64.zip)
 
 ## Usage
 
 ```bash
 # Show help
-FbsDumper.exe --help
+MemoryPackDumper.exe --help
 
 # Generate MemoryPack classes
-FbsDumper.exe --dummy-dll "path/to/dummydll"
+MemoryPackDumper.exe --dummy-dll "path/to/dummydll"
 
 # Specify output file
-FbsDumper.exe --dummy-dll "path/to/dummydll" --output-file "MemoryPack.cs"
+MemoryPackDumper.exe --dummy-dll "path/to/dummydll" --output-file "MemoryPack.cs"
 ```
 
 ## Build
@@ -30,8 +29,8 @@ FbsDumper.exe --dummy-dll "path/to/dummydll" --output-file "MemoryPack.cs"
 2. Clone this repository
 
 ```sh
-git clone https://github.com/ArkanDash/FbsDumper
-cd FbsDumper
+git clone https://github.com/Deathemonic/MemoryPackDumper
+cd MemoryPackDumper
 ```
 
 3. Build using `dotnet`

@@ -80,11 +80,11 @@ jobs:
         uses: vimtor/action-zip@v1.2
         with:
           files: ./publish/${{ matrix.rid }}
-          dest: ${{ github.event.repository.name }}-${{ github.event.inputs.release-tag }}-${{ matrix.rid }}.zip
+          dest: ${{ github.event.repository.name }}-${{ matrix.rid }}.zip
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.event.inputs.release-name }}
           tag_name: ${{ github.event.inputs.release-tag }}
-          files: ${{ github.event.repository.name }}-${{ github.event.inputs.release-tag }}-${{ matrix.rid }}.zip
+          files: ${{ github.event.repository.name }}-${{ matrix.rid }}.zip
