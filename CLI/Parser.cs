@@ -6,7 +6,7 @@ using Utf8StringInterpolation;
 
 namespace FbsDumper.CLI;
 
-public static partial class Parser
+public static class Parser
 {
     private static string _dummyAssemblyDir = "DummyDll";
     private static string _outputFileName = "MemoryPack.cs";
@@ -14,23 +14,6 @@ public static partial class Parser
     public static string? NameSpace2LookFor;
     public static readonly List<TypeDefinition> MemoryPackEnumsToAdd = [];
     public static bool SuppressWarnings;
-
-    private static readonly Dictionary<string, string> TypeMap = new()
-    {
-        ["System.String"] = "string",
-        ["System.Int16"] = "short",
-        ["System.UInt16"] = "ushort",
-        ["System.Int32"] = "int",
-        ["System.UInt32"] = "uint",
-        ["System.Int64"] = "long",
-        ["System.UInt64"] = "ulong",
-        ["System.Boolean"] = "bool",
-        ["System.Single"] = "float",
-        ["System.Double"] = "double",
-        ["System.SByte"] = "sbyte",
-        ["System.Byte"] = "byte",
-        ["System.Decimal"] = "decimal"
-    };
 
     public static void Execute(string dummyDll, string outputFile, string nameSpace,
         string? namespaceToLookFor, bool verbose, bool suppressWarnings)
@@ -129,7 +112,7 @@ public static partial class Parser
         {
             foreach (var member in cls.Members)
             {
-                var typeStr = TypeToString(member.Type);
+                var typeStr = TypeStringConverter.TypeToString(member.Type);
                 if (typeStr.Contains("List<") || typeStr.Contains("Dictionary<") || typeStr.Contains("HashSet<"))
                 {
                     namespaces.Add("System.Collections.Generic");
@@ -175,30 +158,7 @@ public static partial class Parser
     {
         var indent = string.IsNullOrEmpty(_customNameSpace) ? "" : "    ";
 
-        var attrParams = new List<string>();
-        
-        if (!string.IsNullOrEmpty(memoryPackClass.GenerateType) && 
-            memoryPackClass.GenerateType != "Object" && 
-            memoryPackClass.GenerateType != "0")
-        {
-            attrParams.Add($"GenerateType.{memoryPackClass.GenerateType}");
-        }
-        
-        if (!string.IsNullOrEmpty(memoryPackClass.SerializeLayout) && 
-            memoryPackClass.SerializeLayout != "Sequential" &&
-            memoryPackClass.SerializeLayout != "0")
-        {
-            attrParams.Add($"SerializeLayout.{memoryPackClass.SerializeLayout}");
-        }
-        
-        if (attrParams.Count > 0)
-        {
-            writer.AppendFormat($"{indent}[MemoryPackable({string.Join(", ", attrParams)})]\n");
-        }
-        else
-        {
-            writer.AppendFormat($"{indent}[MemoryPackable]\n");
-        }
+        WriteMemoryPackableAttribute(ref writer, memoryPackClass, indent);
 
         foreach (var union in memoryPackClass.Unions)
         {
@@ -214,6 +174,31 @@ public static partial class Parser
         }
 
         writer.AppendFormat($"{indent}}}\n");
+    }
+
+    private static void WriteMemoryPackableAttribute<TBufferWriter>(ref Utf8StringWriter<TBufferWriter> writer, MemoryPackClass memoryPackClass, string indent)
+        where TBufferWriter : IBufferWriter<byte>
+    {
+        var attrParams = new List<string>();
+
+        if (!EnumMapper.IsDefaultGenerateType(memoryPackClass.GenerateType))
+        {
+            attrParams.Add($"GenerateType.{memoryPackClass.GenerateType}");
+        }
+
+        if (!EnumMapper.IsDefaultSerializeLayout(memoryPackClass.SerializeLayout))
+        {
+            attrParams.Add($"SerializeLayout.{memoryPackClass.SerializeLayout}");
+        }
+
+        if (attrParams.Count > 0)
+        {
+            writer.AppendFormat($"{indent}[MemoryPackable({string.Join(", ", attrParams)})]\n");
+        }
+        else
+        {
+            writer.AppendFormat($"{indent}[MemoryPackable]\n");
+        }
     }
 
     private static void WriteMember<TBufferWriter>(ref Utf8StringWriter<TBufferWriter> writer, MemoryPackMember member, string indent)
@@ -241,13 +226,12 @@ public static partial class Parser
             writer.AppendFormat($"{memberIndent}[MemoryPackAllowSerialize]\n");
         }
 
-        // Write custom formatters
         foreach (var formatter in member.CustomFormatters)
         {
             writer.AppendFormat($"{memberIndent}[{formatter}]\n");
         }
 
-        var typeStr = TypeToString(member.Type);
+        var typeStr = TypeStringConverter.TypeToString(member.Type);
 
         if (member.IsField)
         {
@@ -266,7 +250,7 @@ public static partial class Parser
     {
         var indent = string.IsNullOrEmpty(_customNameSpace) ? "" : "    ";
 
-        var enumTypeName = SystemToStringType(memoryPackEnum.Type);
+        var enumTypeName = TypeStringConverter.SystemToStringType(memoryPackEnum.Type);
         writer.AppendFormat($"{indent}public enum {memoryPackEnum.EnumName} : {enumTypeName}\n");
         writer.AppendFormat($"{indent}{{\n");
 
@@ -278,48 +262,5 @@ public static partial class Parser
         }
 
         writer.AppendFormat($"{indent}}}\n");
-    }
-
-    private static string TypeToString(TypeReference typeRef)
-    {
-        if (typeRef is GenericInstanceType genericInstance)
-        {
-            var baseType = genericInstance.ElementType.Name;
-            
-            if (baseType.Contains('`'))
-            {
-                baseType = baseType[..baseType.IndexOf('`')];
-            }
-
-            var genericArgs = string.Join(", ", genericInstance.GenericArguments.Select(TypeToString));
-            return $"{baseType}<{genericArgs}>";
-        }
-
-        if (typeRef.IsArray)
-        {
-            var arrayType = typeRef as ArrayType;
-            return TypeToString(arrayType!.ElementType) + "[]";
-        }
-
-        var typeDef = typeRef.Resolve();
-        if (typeDef != null)
-        {
-            return SystemToStringType(typeDef);
-        }
-
-        return typeRef.Name;
-    }
-
-    private static string SystemToStringType(TypeDefinition typeDef)
-    {
-        var fullName = typeDef.FullName;
-        if (TypeMap.TryGetValue(fullName, out var type))
-            return type;
-
-        var name = typeDef.Name;
-        if (name.StartsWith("System."))
-            Log.Global.LogUnknownSystemType(name);
-
-        return name;
     }
 }
