@@ -41,17 +41,17 @@ public class MemoryPackUnion(int tag, string typeName)
 public class MemoryPackMember(string name, TypeReference type, bool isField)
 {
     public bool AllowSerialize = false;
-    public List<string> CustomFormatters = [];
-    public bool IsField = isField;
+    public readonly List<string> CustomFormatters = [];
+    public readonly bool IsField = isField;
     public bool IsIgnored = false;
     public bool IsInclude = false;
     public bool IsInit = false;
     public bool IsReadOnly = false;
     public bool IsRequired = false;
-    public string Name = name;
+    public readonly string Name = name;
     public int? Order = null;
     public bool SuppressDefaultInitialization = false;
-    public TypeReference Type = type;
+    public readonly TypeReference Type = type;
 }
 
 public class MemoryPackEnum(TypeDefinition valueType, string enumName)
