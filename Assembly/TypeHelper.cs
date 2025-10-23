@@ -1,7 +1,7 @@
-using FbsDumper.CLI;
+using MemoryPackDumper.CLI;
 using Mono.Cecil;
 
-namespace FbsDumper.Assembly;
+namespace MemoryPackDumper.Assembly;
 
 internal static class TypeHelper
 {
@@ -27,11 +27,11 @@ internal static class TypeHelper
     {
         if (typeDef.IsInterface)
             return "interface";
-        if (typeDef.IsAbstract && typeDef.IsSealed)
+        if (typeDef is { IsAbstract: true, IsSealed: true })
             return "static class";
         if (typeDef.IsAbstract)
             return "abstract class";
-        if (typeDef.IsValueType && !typeDef.IsEnum)
+        if (typeDef is { IsValueType: true, IsEnum: false })
             return "struct";
         return "class";
     }

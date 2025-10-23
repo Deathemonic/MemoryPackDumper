@@ -1,4 +1,4 @@
 using ConsoleAppFramework;
-using FbsDumper.CLI;
+using MemoryPackDumper.CLI;
 
 ConsoleApp.Run(args, Args.Run);

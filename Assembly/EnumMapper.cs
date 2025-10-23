@@ -1,4 +1,4 @@
-namespace FbsDumper.Assembly;
+namespace MemoryPackDumper.Assembly;
 
 public static class EnumMapper
 {
@@ -35,4 +35,3 @@ public static class EnumMapper
         return string.IsNullOrEmpty(value) || value == "Sequential" || value == "0";
     }
 }
-

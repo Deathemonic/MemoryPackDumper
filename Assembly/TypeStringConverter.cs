@@ -1,7 +1,7 @@
-using FbsDumper.Helpers;
+using MemoryPackDumper.Helpers;
 using Mono.Cecil;
 
-namespace FbsDumper.Assembly;
+namespace MemoryPackDumper.Assembly;
 
 public static class TypeStringConverter
 {
@@ -24,10 +24,7 @@ public static class TypeStringConverter
 
     public static string TypeToString(TypeReference typeRef)
     {
-        if (typeRef is GenericInstanceType genericInstance)
-        {
-            return ConvertGenericType(genericInstance);
-        }
+        if (typeRef is GenericInstanceType genericInstance) return ConvertGenericType(genericInstance);
 
         if (typeRef.IsArray)
         {
@@ -36,22 +33,14 @@ public static class TypeStringConverter
         }
 
         var typeDef = typeRef.Resolve();
-        if (typeDef != null)
-        {
-            return SystemToStringType(typeDef);
-        }
-
-        return typeRef.Name;
+        return typeDef != null ? SystemToStringType(typeDef) : typeRef.Name;
     }
 
     private static string ConvertGenericType(GenericInstanceType genericInstance)
     {
         var baseType = genericInstance.ElementType.Name;
 
-        if (baseType.Contains('`'))
-        {
-            baseType = baseType[..baseType.IndexOf('`')];
-        }
+        if (baseType.Contains('`')) baseType = baseType[..baseType.IndexOf('`')];
 
         var genericArgs = string.Join(", ", genericInstance.GenericArguments.Select(TypeToString));
         return $"{baseType}<{genericArgs}>";
@@ -70,4 +59,3 @@ public static class TypeStringConverter
         return name;
     }
 }
-

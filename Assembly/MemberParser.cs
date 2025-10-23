@@ -1,7 +1,7 @@
-using FbsDumper.Helpers;
+using MemoryPackDumper.Helpers;
 using Mono.Cecil;
 
-namespace FbsDumper.Assembly;
+namespace MemoryPackDumper.Assembly;
 
 public static class MemberParser
 {
@@ -27,13 +27,14 @@ public static class MemberParser
     private static bool IsRecordType(TypeDefinition typeDef)
     {
         return typeDef.CustomAttributes.Any(a =>
-            a.AttributeType.FullName == "System.Runtime.CompilerServices.CompilerGeneratedAttribute") ||
-            typeDef.BaseType?.Name == "Record";
+                   a.AttributeType.FullName == "System.Runtime.CompilerServices.CompilerGeneratedAttribute") ||
+               typeDef.BaseType?.Name == "Record";
     }
 
-    private static void ProcessProperties(TypeDefinition typeDef, MemoryPackClass memoryPackClass, HashSet<string> discoveredTypes)
+    private static void ProcessProperties(TypeDefinition typeDef, MemoryPackClass memoryPackClass,
+        HashSet<string> discoveredTypes)
     {
-        foreach (var property in typeDef.Properties.Where(p => p.GetMethod != null && !p.GetMethod.IsStatic))
+        foreach (var property in typeDef.Properties.Where(p => p.GetMethod is { IsStatic: false }))
         {
             var member = CreateMemberFromProperty(property);
             if (!ShouldIncludeMember(member, property.GetMethod.IsPublic)) continue;
@@ -43,7 +44,8 @@ public static class MemberParser
         }
     }
 
-    private static void ProcessFields(TypeDefinition typeDef, MemoryPackClass memoryPackClass, HashSet<string> discoveredTypes)
+    private static void ProcessFields(TypeDefinition typeDef, MemoryPackClass memoryPackClass,
+        HashSet<string> discoveredTypes)
     {
         foreach (var field in typeDef.Fields.Where(f => !f.IsStatic && !f.IsLiteral))
         {
@@ -110,8 +112,7 @@ public static class MemberParser
 
     private static bool IsStaticConstructor(MethodDefinition method)
     {
-        return method.IsStatic &&
-               method.Name == "StaticConstructor" &&
+        return method is { IsStatic: true, Name: "StaticConstructor" } &&
                method.ReturnType.FullName == "System.Void" &&
                method.Parameters.Count == 0;
     }
@@ -128,10 +129,7 @@ public static class MemberParser
 
         AttributeExtractor.ExtractMethodAttributes(methodDef, method);
 
-        foreach (var param in methodDef.Parameters)
-        {
-            method.Parameters.Add((param.ParameterType.Name, param.Name));
-        }
+        foreach (var param in methodDef.Parameters) method.Parameters.Add((param.ParameterType.Name, param.Name));
 
         return method;
     }

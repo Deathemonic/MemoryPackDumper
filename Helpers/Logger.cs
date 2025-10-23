@@ -1,9 +1,9 @@
-using FbsDumper.CLI;
 using Kokuban;
+using MemoryPackDumper.CLI;
 using Microsoft.Extensions.Logging;
 using ZLogger;
 
-namespace FbsDumper.Helpers;
+namespace MemoryPackDumper.Helpers;
 
 public static class Log
 {

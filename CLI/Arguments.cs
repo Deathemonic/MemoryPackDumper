@@ -1,4 +1,4 @@
-namespace FbsDumper.CLI;
+namespace MemoryPackDumper.CLI;
 
 public static class Args
 {

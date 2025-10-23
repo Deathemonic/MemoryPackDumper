@@ -1,13 +1,13 @@
 using Mono.Cecil;
+using Mono.Collections.Generic;
 
-namespace FbsDumper.Assembly;
+namespace MemoryPackDumper.Assembly;
 
 public static class AttributeExtractor
 {
     public static void ExtractClassAttributes(TypeDefinition typeDef, MemoryPackClass memoryPackClass)
     {
         foreach (var attr in typeDef.CustomAttributes)
-        {
             switch (attr.AttributeType.Name)
             {
                 case "MemoryPackableAttribute":
@@ -23,27 +23,23 @@ public static class AttributeExtractor
                     memoryPackClass.Attributes.Add(attrName);
                     break;
             }
-        }
     }
 
     private static void ExtractMemoryPackableAttribute(CustomAttribute attr, MemoryPackClass memoryPackClass)
     {
         if (attr.ConstructorArguments.Count > 0 && attr.ConstructorArguments[0].Value != null)
-        {
             memoryPackClass.GenerateType = EnumMapper.MapGenerateType(attr.ConstructorArguments[0].Value.ToString()!);
-        }
 
         if (attr.ConstructorArguments.Count > 1 && attr.ConstructorArguments[1].Value != null)
         {
-            memoryPackClass.SerializeLayout = EnumMapper.MapSerializeLayout(attr.ConstructorArguments[1].Value.ToString()!);
+            memoryPackClass.SerializeLayout =
+                EnumMapper.MapSerializeLayout(attr.ConstructorArguments[1].Value.ToString()!);
         }
         else
         {
             var layoutProp = attr.Properties.FirstOrDefault(p => p.Name == "SerializeLayout");
             if (layoutProp.Argument.Value != null)
-            {
                 memoryPackClass.SerializeLayout = EnumMapper.MapSerializeLayout(layoutProp.Argument.Value.ToString()!);
-            }
         }
     }
 
@@ -53,15 +49,12 @@ public static class AttributeExtractor
 
         var tag = Convert.ToInt32(attr.ConstructorArguments[0].Value);
         if (attr.ConstructorArguments[1].Value is TypeReference typeRef)
-        {
             memoryPackClass.Unions.Add(new MemoryPackUnion(tag, typeRef.Name));
-        }
     }
 
-    public static void ExtractMemberAttributes(Mono.Collections.Generic.Collection<CustomAttribute> attributes, MemoryPackMember member)
+    public static void ExtractMemberAttributes(Collection<CustomAttribute> attributes, MemoryPackMember member)
     {
         foreach (var attr in attributes)
-        {
             switch (attr.AttributeType.Name)
             {
                 case "MemoryPackIgnoreAttribute":
@@ -95,18 +88,15 @@ public static class AttributeExtractor
                         var formatterName = GetAttributeShortName(attr.AttributeType.Name);
                         member.CustomFormatters.Add(formatterName);
                     }
+
                     break;
             }
-        }
     }
 
     public static void ExtractMethodAttributes(MethodDefinition methodDef, MemoryPackMethod method)
     {
-        foreach (var attr in methodDef.CustomAttributes)
-        {
-            var attrName = GetAttributeShortName(attr.AttributeType.Name);
-            method.Attributes.Add(attrName);
-        }
+        foreach (var attrName in methodDef.CustomAttributes.Select(attr =>
+                     GetAttributeShortName(attr.AttributeType.Name))) method.Attributes.Add(attrName);
     }
 
     private static string GetAttributeShortName(string attributeName)
@@ -116,4 +106,3 @@ public static class AttributeExtractor
             : attributeName;
     }
 }
-

@@ -1,7 +1,7 @@
-using FbsDumper.CLI;
+using MemoryPackDumper.CLI;
 using Mono.Cecil;
 
-namespace FbsDumper.Assembly;
+namespace MemoryPackDumper.Assembly;
 
 public static class TypeReferenceTracker
 {
@@ -17,18 +17,11 @@ public static class TypeReferenceTracker
             return;
         }
 
-        if (IsMemoryPackable(typeDef))
-        {
-            discoveredTypes.Add(typeDef.FullName);
-        }
+        if (IsMemoryPackable(typeDef)) discoveredTypes.Add(typeDef.FullName);
 
-        if (typeRef is GenericInstanceType genericInstance)
-        {
-            foreach (var genericArg in genericInstance.GenericArguments)
-            {
-                TrackReferencedType(genericArg, discoveredTypes);
-            }
-        }
+        if (typeRef is not GenericInstanceType genericInstance) return;
+        foreach (var genericArg in genericInstance.GenericArguments)
+            TrackReferencedType(genericArg, discoveredTypes);
     }
 
     private static bool IsMemoryPackable(TypeDefinition typeDef)
@@ -36,4 +29,3 @@ public static class TypeReferenceTracker
         return typeDef.CustomAttributes.Any(a => a.AttributeType.Name == "MemoryPackableAttribute");
     }
 }
-
