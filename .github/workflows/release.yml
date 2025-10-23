@@ -3,14 +3,9 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      release-name:
-        description: 'The name for the new release'
-        required: true
-        default: 'Release'
       release-tag:
-        description: 'The tag for the new release (e.g., v1.0.0)'
         required: true
-        default: 'v1.0.0'
+        default: ''
 
 jobs:
   build:
@@ -85,6 +80,6 @@ jobs:
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ github.event.inputs.release-name }}
+          name: ${{ github.event.inputs.release-tag }}
           tag_name: ${{ github.event.inputs.release-tag }}
           files: ${{ github.event.repository.name }}-${{ matrix.rid }}.zip
