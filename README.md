@@ -1,14 +1,14 @@
-# FbsDumper
+# MemoryPackDumper
 
-A tool to recover FlatBuffer schema definitions from game assemblies with assembly instruction parsing.
+A tool to recover MemoryPack C# class definitions from IL2CPP game assemblies.
 
-*Originally made for **Blue Archive**, should theoretically work with other games but is untested.*
+*Originally made for **Blue Archive**, should theoretically work with other games that use MemoryPack.*
 
 ## Install
 
-You can download the latest pre-build binaries at [Releases](https://github.com/ArkanDash/FbsDumper/releases)
+You can download the latest pre-build binaries at [Releases](https://github.com/Deathemonic/MemoryPackDumper/releases)
 
-[Windows](https://github.com/ArkanDash/FbsDumper/releases/latest/download/FbsDumper-v2.1.0-win-x64.zip) | [Linux](https://github.com/ArkanDash/FbsDumper/releases/latest/download/FbsDumper-v2.1.0-linux-x64.zip) | [MacOS](https://github.com/ArkanDash/FbsDumper/releases/latest/download/FbsDumper-v2.1.0-osx-arm64.zip) 
+[Windows](https://github.com/Deathemonic/MemoryPackDumper/releases/latest/download/FbsDumper-v2.1.0-win-x64.zip) | [Linux](https://github.com/Deathemonic/MemoryPackDumper/releases/latest/download/FbsDumper-v2.1.0-linux-x64.zip) | [MacOS](https://github.com/Deathemonic/MemoryPackDumper/releases/latest/download/FbsDumper-v2.1.0-osx-arm64.zip) 
 
 
 ## Usage
@@ -17,11 +17,11 @@ You can download the latest pre-build binaries at [Releases](https://github.com/
 # Show help
 FbsDumper.exe --help
 
-# Generate schema using assembly
-FbsDumper.exe --dummy-dll "path/to/DummyDll" --game-assembly "path/to/libil2cpp.so"
+# Generate MemoryPack classes
+FbsDumper.exe --dummy-dll "path/to/dummydll"
 
-# Generate schema without assembly
-FbsDumper.exe --dummy-dll "path/to/DummyDll"
+# Specify output file
+FbsDumper.exe --dummy-dll "path/to/dummydll" --output-file "MemoryPack.cs"
 ```
 
 ## Build
@@ -40,16 +40,12 @@ cd FbsDumper
 dotnet build
 ```
 
-### Options
+## Options
 
 - `-d, --dummy-dll`: Specifies the dummy DLL directory (Required)
-- `-a, --game-assembly`: Specifies the path to libil2cpp.so (ARM) or GameAssembly.dll (x86/x64) (Optional: Skip assembly
-  analysis)
-- `-o, --output-file`: Specifies the output file (Default: BlueArchive.fbs)
-- `-n, --namespace`: Specifies the flatdata namespace (Default: FlatData)
-- `-s, --force-snake-case`: Force snake case conversion
-- `-nl, --namespace-to-look-for`: Specifies the namespace to look for
-- `-f, --force`: Force processing using Add methods when no Create method exists
+- `-o, --output-file`: Specifies the output file (Default: MemoryPack.cs)
+- `-n, --namespace`: Specifies the C# namespace for generated classes (Default: FlatData)
+- `-nl, --namespace-to-look-for`: Specifies the namespace to look for (filters types)
 - `-v, --verbose`: Enable verbose debug logging
 - `-sw, --suppress-warnings`: Suppress warning messages
 
@@ -57,4 +53,3 @@ dotnet build
 > **Disclaimer:** This software is made solely for educational purposes. I do not claim any responsibility for any usage
 > of this software.
 
-Copyright © 2025 [Hiro420](https://github.com/Hiro420)

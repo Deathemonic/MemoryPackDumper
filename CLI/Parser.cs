@@ -1,8 +1,6 @@
 using System.Buffers;
-using System.Text.RegularExpressions;
 using FbsDumper.Assembly;
 using FbsDumper.Helpers;
-using FbsDumper.Instructions;
 using Mono.Cecil;
 using Utf8StringInterpolation;
 
@@ -11,17 +9,11 @@ namespace FbsDumper.CLI;
 public static partial class Parser
 {
     private static string _dummyAssemblyDir = "DummyDll";
-    public static string GameAssemblyPath = "libil2cpp.so";
-    private static string _outputFileName = "BlueArchive.fbs";
+    private static string _outputFileName = "MemoryPack.cs";
     private static string? _customNameSpace = "FlatData";
-    private static bool _forceSnakeCase;
     public static string? NameSpace2LookFor;
-    private static readonly string FlatBaseType = "FlatBuffers.IFlatbufferObject";
-    public static FlatBuilder FlatBufferBuilder = null!;
-    public static readonly List<TypeDefinition> FlatEnumsToAdd = [];
+    public static readonly List<TypeDefinition> MemoryPackEnumsToAdd = [];
     public static bool SuppressWarnings;
-    public static bool NoAsmProcessing;
-    public static bool Force;
 
     private static readonly Dictionary<string, string> TypeMap = new()
     {
@@ -34,42 +26,28 @@ public static partial class Parser
         ["System.UInt64"] = "ulong",
         ["System.Boolean"] = "bool",
         ["System.Single"] = "float",
-        ["System.SByte"] = "int8",
-        ["System.Byte"] = "uint8"
+        ["System.Double"] = "double",
+        ["System.SByte"] = "sbyte",
+        ["System.Byte"] = "byte",
+        ["System.Decimal"] = "decimal"
     };
 
-    public static void Execute(string dummyDll, string gameAssembly, string outputFile, string nameSpace,
-        bool forceSnakeCase, string? namespaceToLookFor, bool force, bool verbose, bool suppressWarnings)
+    public static void Execute(string dummyDll, string outputFile, string nameSpace,
+        string? namespaceToLookFor, bool verbose, bool suppressWarnings)
     {
         if (verbose) Log.EnableDebugLogging();
 
         SuppressWarnings = suppressWarnings;
 
         _dummyAssemblyDir = dummyDll;
-        GameAssemblyPath = gameAssembly;
         _outputFileName = outputFile;
         _customNameSpace = nameSpace;
         NameSpace2LookFor = namespaceToLookFor;
-        _forceSnakeCase = forceSnakeCase;
-        Force = force;
 
         if (!Directory.Exists(_dummyAssemblyDir))
         {
             Log.Global.LogDummyDirNotFound(_dummyAssemblyDir);
             Log.Error("Please provide a valid path using -dummydll or -d.");
-            Log.Shutdown();
-            Environment.Exit(1);
-        }
-
-        if (string.IsNullOrEmpty(GameAssemblyPath))
-        {
-            Log.Info("No game assembly provided. Skipping assembly analysis.");
-            NoAsmProcessing = true;
-        }
-        else if (!File.Exists(GameAssemblyPath))
-        {
-            Log.Global.LogGameAssemblyNotFound(GameAssemblyPath);
-            Log.Error("Please provide a valid path using -gameassembly or -a.");
             Log.Shutdown();
             Environment.Exit(1);
         }
@@ -92,66 +70,99 @@ public static partial class Parser
 
         var asm = AssemblyDefinition.ReadAssembly(blueArchiveDllPath, readerParameters);
 
-        var flatBuffersDllPath = Path.Combine(_dummyAssemblyDir, "FlatBuffers.dll");
-        if (!File.Exists(flatBuffersDllPath))
-        {
-            Log.Global.LogFileNotFound("FlatBuffers.dll", _dummyAssemblyDir);
-            Log.Shutdown();
-            Environment.Exit(1);
-        }
+        Log.Info("Getting a list of MemoryPackable types...");
 
-        var asmFbs = AssemblyDefinition.ReadAssembly(flatBuffersDllPath, readerParameters);
+        var typeDefs = TypeHelper.GetAllMemoryPackableTypes(asm.MainModule);
 
-        FlatBufferBuilder = new FlatBuilder(asmFbs.MainModule);
-
-        var architecture = NoAsmProcessing ? Architecture.X86 : TypeHelper.DetectArchitecture(GameAssemblyPath);
-        var typeParser = TypeHelper.GetTypeParser(architecture);
-
-        Log.Info(NoAsmProcessing ? "Using no assembly analysis mode" : $"Detected architecture: {architecture}");
-        Log.Info("Getting a list of types...");
-
-        var typeDefs = TypeHelper.GetAllFlatBufferTypes(asm.MainModule, FlatBaseType);
-
-        FlatSchema schema = new();
-
-        var done = 0;
+        MemoryPackSchema schema = new();
+        var processedTypes = new HashSet<string>();
+        var discoveredTypes = new HashSet<string>();
 
         foreach (var typeDef in typeDefs)
         {
-            Log.Global.LogProgress(done + 1, typeDefs.Count);
-            var table = TypeHelper.TypeToTable(typeParser, typeDef);
+            discoveredTypes.Add(typeDef.FullName);
+        }
 
-            schema.FlatTables.Add(table);
+        var done = 0;
+
+        while (discoveredTypes.Count > 0)
+        {
+            var typeToProcess = discoveredTypes.First();
+            discoveredTypes.Remove(typeToProcess);
+
+            if (processedTypes.Contains(typeToProcess))
+                continue;
+
+            processedTypes.Add(typeToProcess);
+
+            var typeDef = asm.MainModule.GetTypes().FirstOrDefault(t => t.FullName == typeToProcess);
+            if (typeDef == null)
+                continue;
+
+            Log.Global.LogProgress(done + 1, typeDefs.Count);
+            var memoryPackClass = MemberParser.TypeToMemoryPackClass(typeDef, discoveredTypes);
+            schema.Classes.Add(memoryPackClass);
             done += 1;
         }
 
         Log.Info("Adding enums...");
-        foreach (var fEnum in FlatEnumsToAdd.Select(TypeHelper.TypeToEnum)) schema.FlatEnums.Add(fEnum);
+        foreach (var fEnum in MemoryPackEnumsToAdd.Select(MemberParser.TypeToEnum))
+            schema.Enums.Add(fEnum);
 
-        Log.Info($"Writing schema to {_outputFileName}...");
+        Log.Info($"Writing C# code to {_outputFileName}...");
 
         WriteSchema(_outputFileName, schema);
 
         Log.Info("Done.");
     }
 
-    private static void WriteSchema(string fileName, FlatSchema schema)
+    private static void WriteSchema(string fileName, MemoryPackSchema schema)
     {
         using var buffer = Utf8String.CreateWriter(out var stringWriter);
 
-        if (!string.IsNullOrEmpty(_customNameSpace))
-            stringWriter.AppendFormat($"namespace {_customNameSpace};\n\n");
-
-        foreach (var flatEnum in schema.FlatEnums)
+        var namespaces = new HashSet<string>
         {
-            WriteTableEnum(ref stringWriter, flatEnum);
+            "MemoryPack"
+        };
+
+        foreach (var cls in schema.Classes)
+        {
+            foreach (var member in cls.Members)
+            {
+                var typeStr = TypeToString(member.Type);
+                if (typeStr.Contains("List<") || typeStr.Contains("Dictionary<") || typeStr.Contains("HashSet<"))
+                {
+                    namespaces.Add("System.Collections.Generic");
+                }
+            }
+        }
+
+        foreach (var ns in namespaces.OrderBy(n => n))
+        {
+            stringWriter.AppendFormat($"using {ns};\n");
+        }
+        stringWriter.AppendLine();
+
+        if (!string.IsNullOrEmpty(_customNameSpace))
+        {
+            stringWriter.AppendFormat($"namespace {_customNameSpace}\n{{\n");
+        }
+
+        foreach (var memoryPackEnum in schema.Enums)
+        {
+            WriteEnum(ref stringWriter, memoryPackEnum);
             stringWriter.AppendLine();
         }
 
-        foreach (var flatTable in schema.FlatTables)
+        foreach (var memoryPackClass in schema.Classes)
         {
-            WriteTable(ref stringWriter, flatTable);
+            WriteClass(ref stringWriter, memoryPackClass);
             stringWriter.AppendLine();
+        }
+
+        if (!string.IsNullOrEmpty(_customNameSpace))
+        {
+            stringWriter.AppendLiteral("}\n");
         }
 
         stringWriter.Flush();
@@ -159,65 +170,156 @@ public static partial class Parser
         File.WriteAllBytes(fileName, buffer.ToArray());
     }
 
-    private static void WriteTable<TBufferWriter>(ref Utf8StringWriter<TBufferWriter> writer, FlatTable table)
+    private static void WriteClass<TBufferWriter>(ref Utf8StringWriter<TBufferWriter> writer, MemoryPackClass memoryPackClass)
         where TBufferWriter : IBufferWriter<byte>
     {
-        writer.AppendFormat($"table {table.TableName} {{\n");
+        var indent = string.IsNullOrEmpty(_customNameSpace) ? "" : "    ";
 
-        if (table.NoCreate) writer.AppendLiteral("\t// No Create method\n");
-
-        foreach (var tableField in table.Fields)
-            WriteTableField(ref writer, tableField);
-
-        writer.AppendLiteral("}\n");
-    }
-
-    private static void WriteTableEnum<TBufferWriter>(ref Utf8StringWriter<TBufferWriter> writer, FlatEnum fEnum)
-        where TBufferWriter : IBufferWriter<byte>
-    {
-        var enumTypeName = SystemToStringType(fEnum.Type);
-        writer.AppendFormat($"enum {fEnum.EnumName} : {enumTypeName} {{\n");
-
-        for (var i = 0; i < fEnum.Fields.Count; i++)
+        var attrParams = new List<string>();
+        
+        if (!string.IsNullOrEmpty(memoryPackClass.GenerateType) && 
+            memoryPackClass.GenerateType != "Object" && 
+            memoryPackClass.GenerateType != "0")
         {
-            var field = fEnum.Fields[i];
-            var isLast = i == fEnum.Fields.Count - 1;
-            writer.AppendFormat($"\t{field.Name} = {field.Value}{(isLast ? "" : ",")}\n");
+            attrParams.Add($"GenerateType.{memoryPackClass.GenerateType}");
+        }
+        
+        if (!string.IsNullOrEmpty(memoryPackClass.SerializeLayout) && 
+            memoryPackClass.SerializeLayout != "Sequential" &&
+            memoryPackClass.SerializeLayout != "0")
+        {
+            attrParams.Add($"SerializeLayout.{memoryPackClass.SerializeLayout}");
+        }
+        
+        if (attrParams.Count > 0)
+        {
+            writer.AppendFormat($"{indent}[MemoryPackable({string.Join(", ", attrParams)})]\n");
+        }
+        else
+        {
+            writer.AppendFormat($"{indent}[MemoryPackable]\n");
         }
 
-        writer.AppendLiteral("}\n");
+        foreach (var union in memoryPackClass.Unions)
+        {
+            writer.AppendFormat($"{indent}[MemoryPackUnion({union.Tag}, typeof({union.TypeName}))]\n");
+        }
+
+        writer.AppendFormat($"{indent}public partial {memoryPackClass.TypeKeyword} {memoryPackClass.ClassName}\n");
+        writer.AppendFormat($"{indent}{{\n");
+
+        foreach (var member in memoryPackClass.Members)
+        {
+            WriteMember(ref writer, member, indent);
+        }
+
+        writer.AppendFormat($"{indent}}}\n");
     }
 
-    private static void WriteTableField<TBufferWriter>(ref Utf8StringWriter<TBufferWriter> writer, FlatField field)
+    private static void WriteMember<TBufferWriter>(ref Utf8StringWriter<TBufferWriter> writer, MemoryPackMember member, string indent)
         where TBufferWriter : IBufferWriter<byte>
     {
-        var fieldName = _forceSnakeCase ? CamelToSnake(field.Name) : field.Name;
-        var fieldType = SystemToStringType(field.Type);
+        var memberIndent = indent + "    ";
 
-        if (field.IsArray) fieldType = $"[{fieldType}]";
+        if (member.Order.HasValue)
+        {
+            writer.AppendFormat($"{memberIndent}[MemoryPackOrder({member.Order.Value})]\n");
+        }
 
-        writer.AppendFormat($"\t{fieldName}: {fieldType}; // index 0x{field.Offset:X}\n");
+        if (member.IsInclude)
+        {
+            writer.AppendFormat($"{memberIndent}[MemoryPackInclude]\n");
+        }
+
+        if (member.SuppressDefaultInitialization)
+        {
+            writer.AppendFormat($"{memberIndent}[SuppressDefaultInitialization]\n");
+        }
+
+        if (member.AllowSerialize)
+        {
+            writer.AppendFormat($"{memberIndent}[MemoryPackAllowSerialize]\n");
+        }
+
+        // Write custom formatters
+        foreach (var formatter in member.CustomFormatters)
+        {
+            writer.AppendFormat($"{memberIndent}[{formatter}]\n");
+        }
+
+        var typeStr = TypeToString(member.Type);
+
+        if (member.IsField)
+        {
+            writer.AppendFormat($"{memberIndent}public {typeStr} {member.Name};\n");
+        }
+        else
+        {
+            writer.AppendFormat($"{memberIndent}public {typeStr} {member.Name} {{ get; set; }}\n");
+        }
+
+        writer.AppendLine();
     }
 
-    private static string CamelToSnake(string camelStr)
+    private static void WriteEnum<TBufferWriter>(ref Utf8StringWriter<TBufferWriter> writer, MemoryPackEnum memoryPackEnum)
+        where TBufferWriter : IBufferWriter<byte>
     {
-        var isAllUppercase = camelStr.All(char.IsUpper);
-        if (string.IsNullOrEmpty(camelStr) || isAllUppercase)
-            return camelStr;
-        return CamelToSnakeRegex().Replace(camelStr, "$1_").ToLower();
+        var indent = string.IsNullOrEmpty(_customNameSpace) ? "" : "    ";
+
+        var enumTypeName = SystemToStringType(memoryPackEnum.Type);
+        writer.AppendFormat($"{indent}public enum {memoryPackEnum.EnumName} : {enumTypeName}\n");
+        writer.AppendFormat($"{indent}{{\n");
+
+        for (var i = 0; i < memoryPackEnum.Fields.Count; i++)
+        {
+            var field = memoryPackEnum.Fields[i];
+            var isLast = i == memoryPackEnum.Fields.Count - 1;
+            writer.AppendFormat($"{indent}    {field.Name} = {field.Value}{(isLast ? "" : ",")}\n");
+        }
+
+        writer.AppendFormat($"{indent}}}\n");
     }
 
-    private static string SystemToStringType(TypeDefinition field)
+    private static string TypeToString(TypeReference typeRef)
     {
-        var fullName = field.FullName;
-        if (TypeMap.TryGetValue(fullName, out var type)) return type;
+        if (typeRef is GenericInstanceType genericInstance)
+        {
+            var baseType = genericInstance.ElementType.Name;
+            
+            if (baseType.Contains('`'))
+            {
+                baseType = baseType[..baseType.IndexOf('`')];
+            }
 
-        var name = field.Name;
-        if (name.StartsWith("System.")) Log.Global.LogUnknownSystemType(name);
+            var genericArgs = string.Join(", ", genericInstance.GenericArguments.Select(TypeToString));
+            return $"{baseType}<{genericArgs}>";
+        }
+
+        if (typeRef.IsArray)
+        {
+            var arrayType = typeRef as ArrayType;
+            return TypeToString(arrayType!.ElementType) + "[]";
+        }
+
+        var typeDef = typeRef.Resolve();
+        if (typeDef != null)
+        {
+            return SystemToStringType(typeDef);
+        }
+
+        return typeRef.Name;
+    }
+
+    private static string SystemToStringType(TypeDefinition typeDef)
+    {
+        var fullName = typeDef.FullName;
+        if (TypeMap.TryGetValue(fullName, out var type))
+            return type;
+
+        var name = typeDef.Name;
+        if (name.StartsWith("System."))
+            Log.Global.LogUnknownSystemType(name);
 
         return name;
     }
-
-    [GeneratedRegex(@"(([a-z])(?=[A-Z][a-zA-Z])|([A-Z])(?=[A-Z][a-z]))")]
-    private static partial Regex CamelToSnakeRegex();
 }
